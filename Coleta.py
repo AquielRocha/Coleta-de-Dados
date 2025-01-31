@@ -54,22 +54,30 @@ for unidade, instrumentos in instrumentos_por_unidade.items():
     for instrumento in instrumentos:
         chave = (unidade, instrumento)
         if chave not in st.session_state.objetivos_por_instrumento:
-            st.session_state.objetivos_por_instrumento[chave] = []
+            st.session_state.objetivos_por_instrumento[chave] = [""]
 
         st.write(f"### Objetivos para '{instrumento}' na unidade '{unidade}':")
+        
+        # Exibir campos para os objetivos adicionados
         for i, obj in enumerate(st.session_state.objetivos_por_instrumento[chave]):
             cols = st.columns([4, 1])  # Campo + botão de remoção
             with cols[0]:
-                novo_obj = st.text_input(f"Objetivo {i + 1}:", value=obj, key=f"obj_{unidade}_{instrumento}_{i}")
-                st.session_state.objetivos_por_instrumento[chave][i] = novo_obj
+                st.session_state.objetivos_por_instrumento[chave][i] = st.text_input(
+                    f"Objetivo {i + 1}:", value=obj, key=f"obj_{unidade}_{instrumento}_{i}")
             with cols[1]:
                 if st.button("❌", key=f"remove_{unidade}_{instrumento}_{i}"):
                     st.session_state.objetivos_por_instrumento[chave].pop(i)
-                    st.experimental_rerun()
+                    st.rerun()
 
-        if st.button(f"Adicionar Objetivo para '{instrumento}'", key=f"add_{unidade}_{instrumento}"):
-            if "Novo Objetivo" not in st.session_state.objetivos_por_instrumento[chave]:
-                st.session_state.objetivos_por_instrumento[chave].append("")
+        # Exibir opção para adicionar mais objetivos
+        adicionar_mais = st.radio(
+            f"Deseja adicionar mais objetivos para '{instrumento}'?",
+            ["Não", "Sim"],
+            key=f"add_more_{unidade}_{instrumento}",
+            index=0
+        )
+        if adicionar_mais == "Sim":
+            st.session_state.objetivos_por_instrumento[chave].append("")
 
 # Seleção de Eixos Temáticos para Cada Objetivo
 eixos_por_objetivo = {}
@@ -78,8 +86,12 @@ if st.session_state.objetivos_por_instrumento:
     for (unidade, instrumento), objetivos in st.session_state.objetivos_por_instrumento.items():
         for objetivo in objetivos:
             if objetivo.strip():
-                eixos_selecionados = st.multiselect(f"Eixos Temáticos para o Objetivo '{objetivo}'", eixos, key=f"eixo_{unidade}_{instrumento}_{objetivo}")
-                eixos_por_objetivo[(unidade, instrumento, objetivo)] = list(set(eixos_selecionados))  # Evitar duplicados
+                eixos_selecionados = st.multiselect(
+                    f"Eixos Temáticos para o Objetivo '{objetivo}'",
+                    eixos,
+                    key=f"eixo_{unidade}_{instrumento}_{objetivo}"
+                )
+                eixos_por_objetivo[(unidade, instrumento, objetivo)] = list(set(eixos_selecionados))
 
 # Seleção de Ações de Manejo para Cada Eixo Temático
 acoes_por_eixo = {}
@@ -87,8 +99,12 @@ if eixos_por_objetivo:
     acoes = obter_dados("SELECT nome FROM acao_manejo")
     for (unidade, instrumento, objetivo), eixos in eixos_por_objetivo.items():
         for eixo in eixos:
-            acoes_selecionadas = st.multiselect(f"Ações de Manejo para o Eixo '{eixo}' (Objetivo: {objetivo})", acoes, key=f"acao_{unidade}_{instrumento}_{objetivo}_{eixo}")
-            acoes_por_eixo[(unidade, instrumento, objetivo, eixo)] = list(set(acoes_selecionadas))  # Evitar duplicados
+            acoes_selecionadas = st.multiselect(
+                f"Ações de Manejo para o Eixo '{eixo}' (Objetivo: {objetivo})",
+                acoes,
+                key=f"acao_{unidade}_{instrumento}_{objetivo}_{eixo}"
+            )
+            acoes_por_eixo[(unidade, instrumento, objetivo, eixo)] = list(set(acoes_selecionadas))
 
 # Exibir Resumo Antes de Salvar
 st.subheader("Resumo das Vinculações")
@@ -103,7 +119,7 @@ if setor_escolhido and unidades_selecionadas:
                 chave = (unidade, instrumento)
                 objetivos = st.session_state.objetivos_por_instrumento.get(chave, [])
                 for i, objetivo in enumerate(objetivos):
-                    st.write(f"  - Objetivo {i+1}: {objetivo}")
+                    st.write(f"  - Objetivo {i + 1}: {objetivo}")
                     eixos = eixos_por_objetivo.get((unidade, instrumento, objetivo), [])
                     for eixo in eixos:
                         st.write(f"    - Eixo: {eixo}")

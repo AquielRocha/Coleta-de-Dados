@@ -12,17 +12,31 @@ def conectar_banco():
         port="5432"
     )
 
-# Função para buscar dados de uma tabela
+# Função para buscar dados de uma tabela com caching
+@st.cache_data(ttl=600)  # Cache por 10 minutos
 def obter_dados(query, params=None):
-    conn = conectar_banco()
-    cur = conn.cursor()
-    cur.execute(query, params if params else ())
-    dados = cur.fetchall()
-    conn.close()
-    return [d[0] for d in dados]
+    try:
+        conn = conectar_banco()
+        cur = conn.cursor()
+        cur.execute(query, params if params else ())
+        dados = cur.fetchall()
+        cur.close()
+        conn.close()
+        return [d[0] for d in dados]
+    except Exception as e:
+        st.error(f"Erro ao buscar dados: {e}")
+        return []
+
+# Inicializando estados do Streamlit
+if "objetivos_por_instrumento" not in st.session_state:
+    st.session_state["objetivos_por_instrumento"] = {}
+
+if "objetivos_inputs" not in st.session_state:
+    st.session_state["objetivos_inputs"] = {}
 
 # Interface no Streamlit
 st.title("Gestão de Manejo - ICMBio")
+st.info("Preencha as informações passo a passo para registrar as vinculações de maneira completa.")
 
 # Campo para Identificação do Usuário
 usuario = st.text_input("Digite seu nome ou ID para identificar o preenchimento:")
@@ -41,62 +55,67 @@ unidades_selecionadas = st.multiselect("Selecione as Unidades de Conservação",
 # Seleção de Instrumentos
 instrumentos = obter_dados("SELECT DISTINCT nome FROM instrumento")
 instrumentos_por_unidade = {}
+
 if unidades_selecionadas:
     for unidade in unidades_selecionadas:
         instrumentos_escolhidos = st.multiselect(f"Selecione os Instrumentos para '{unidade}'", instrumentos, key=f"inst_{unidade}")
         instrumentos_por_unidade[unidade] = instrumentos_escolhidos
 
-# Gerenciar múltiplos objetivos por instrumento
-if "objetivos_por_instrumento" not in st.session_state:
-    st.session_state.objetivos_por_instrumento = {}
+# Seleção de Objetivos Específicos (Substituído por Input de Texto)
+objetivos_disponiveis = []  # Não estamos mais usando objetivos pré-definidos
 
 for unidade, instrumentos in instrumentos_por_unidade.items():
     for instrumento in instrumentos:
         chave = (unidade, instrumento)
-        if chave not in st.session_state.objetivos_por_instrumento:
-            st.session_state.objetivos_por_instrumento[chave] = [""]
+        if chave not in st.session_state["objetivos_por_instrumento"]:
+            st.session_state["objetivos_por_instrumento"][chave] = []
+        if chave not in st.session_state["objetivos_inputs"]:
+            st.session_state["objetivos_inputs"][chave] = ""
 
         st.write(f"### Objetivos para '{instrumento}' na unidade '{unidade}':")
         
-        # Exibir campos para os objetivos adicionados
-        for i, obj in enumerate(st.session_state.objetivos_por_instrumento[chave]):
-            cols = st.columns([4, 1])  # Campo + botão de remoção
-            with cols[0]:
-                st.session_state.objetivos_por_instrumento[chave][i] = st.text_input(
-                    f"Objetivo {i + 1}:", value=obj, key=f"obj_{unidade}_{instrumento}_{i}")
-            with cols[1]:
-                if st.button("❌", key=f"remove_{unidade}_{instrumento}_{i}"):
-                    st.session_state.objetivos_por_instrumento[chave].pop(i)
-                    st.rerun()
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            novo_objetivo = st.text_input(
+                f"Adicione um Objetivo Específico para '{instrumento}' na unidade '{unidade}':",
+                key=f"novo_obj_{unidade}_{instrumento}"
+            )
+        with col2:
+            if st.button("Adicionar", key=f"add_obj_{unidade}_{instrumento}"):
+                if novo_objetivo.strip():
+                    st.session_state["objetivos_por_instrumento"][chave].append(novo_objetivo.strip())
+                    st.session_state["objetivos_inputs"][chave] = ""
+                else:
+                    st.warning("Por favor, insira um objetivo válido antes de adicionar.")
 
-        # Exibir opção para adicionar mais objetivos
-        adicionar_mais = st.radio(
-            f"Deseja adicionar mais objetivos para '{instrumento}'?",
-            ["Não", "Sim"],
-            key=f"add_more_{unidade}_{instrumento}",
-            index=0
-        )
-        if adicionar_mais == "Sim":
-            st.session_state.objetivos_por_instrumento[chave].append("")
+        # Exibir Lista de Objetivos Adicionados
+        objetivos_atualizados = st.session_state["objetivos_por_instrumento"][chave]
+        if objetivos_atualizados:
+            st.write("**Objetivos Adicionados:**")
+            for idx, obj in enumerate(objetivos_atualizados, 1):
+                st.write(f"{idx}. {obj}")
+                # Opção para remover um objetivo
+                if st.button(f"Remover", key=f"remove_obj_{unidade}_{instrumento}_{idx}"):
+                    st.session_state["objetivos_por_instrumento"][chave].pop(idx-1)
+                    st.experimental_rerun()
 
-# Seleção de Eixos Temáticos para Cada Objetivo
+# Seleção de Eixos Temáticos
 eixos_por_objetivo = {}
-if st.session_state.objetivos_por_instrumento:
-    eixos = obter_dados("SELECT nome FROM eixo_tematico")
-    for (unidade, instrumento), objetivos in st.session_state.objetivos_por_instrumento.items():
+eixos = obter_dados("SELECT nome FROM eixo_tematico")
+if st.session_state["objetivos_por_instrumento"]:
+    for (unidade, instrumento), objetivos in st.session_state["objetivos_por_instrumento"].items():
         for objetivo in objetivos:
-            if objetivo.strip():
-                eixos_selecionados = st.multiselect(
-                    f"Eixos Temáticos para o Objetivo '{objetivo}'",
-                    eixos,
-                    key=f"eixo_{unidade}_{instrumento}_{objetivo}"
-                )
-                eixos_por_objetivo[(unidade, instrumento, objetivo)] = list(set(eixos_selecionados))
+            eixos_selecionados = st.multiselect(
+                f"Eixos Temáticos para o Objetivo '{objetivo}' no Instrumento '{instrumento}' na Unidade '{unidade}'",
+                eixos,
+                key=f"eixo_{unidade}_{instrumento}_{objetivo}"
+            )
+            eixos_por_objetivo[(unidade, instrumento, objetivo)] = eixos_selecionados
 
-# Seleção de Ações de Manejo para Cada Eixo Temático
+# Seleção de Ações de Manejo
 acoes_por_eixo = {}
+acoes = obter_dados("SELECT nome FROM acao_manejo")
 if eixos_por_objetivo:
-    acoes = obter_dados("SELECT nome FROM acao_manejo")
     for (unidade, instrumento, objetivo), eixos in eixos_por_objetivo.items():
         for eixo in eixos:
             acoes_selecionadas = st.multiselect(
@@ -104,7 +123,7 @@ if eixos_por_objetivo:
                 acoes,
                 key=f"acao_{unidade}_{instrumento}_{objetivo}_{eixo}"
             )
-            acoes_por_eixo[(unidade, instrumento, objetivo, eixo)] = list(set(acoes_selecionadas))
+            acoes_por_eixo[(unidade, instrumento, objetivo, eixo)] = acoes_selecionadas
 
 # Exibir Resumo Antes de Salvar
 st.subheader("Resumo das Vinculações")
@@ -113,47 +132,74 @@ if setor_escolhido and unidades_selecionadas:
     for unidade in unidades_selecionadas:
         st.write(f"### Unidade de Conservação: {unidade}")
         instrumentos = instrumentos_por_unidade.get(unidade, [])
-        if instrumentos:
-            st.write(f"- **Instrumentos:** {', '.join(instrumentos)}")
-            for instrumento in instrumentos:
-                chave = (unidade, instrumento)
-                objetivos = st.session_state.objetivos_por_instrumento.get(chave, [])
-                for i, objetivo in enumerate(objetivos):
-                    st.write(f"  - Objetivo {i + 1}: {objetivo}")
-                    eixos = eixos_por_objetivo.get((unidade, instrumento, objetivo), [])
-                    for eixo in eixos:
-                        st.write(f"    - Eixo: {eixo}")
-                        acoes = acoes_por_eixo.get((unidade, instrumento, objetivo, eixo), [])
-                        for acao in acoes:
-                            st.write(f"      - Ação de Manejo: {acao}")
+        for instrumento in instrumentos:
+            st.write(f"- **Instrumento:** {instrumento}")
+            objetivos = st.session_state["objetivos_por_instrumento"].get((unidade, instrumento), [])
+            for objetivo in objetivos:
+                st.write(f"  - **Objetivo:** {objetivo}")
+                eixos = eixos_por_objetivo.get((unidade, instrumento, objetivo), [])
+                for eixo in eixos:
+                    st.write(f"    - **Eixo Temático:** {eixo}")
+                    acoes = acoes_por_eixo.get((unidade, instrumento, objetivo, eixo), [])
+                    st.write(f"      - **Ações de Manejo:** {', '.join(acoes) if acoes else 'Nenhuma'}")
 else:
     st.warning("Nenhum dado preenchido para exibição.")
 
 # Função para salvar os dados no banco
 def salvar_vinculacoes():
-    with st.spinner("Salvando dados..."):
-        try:
-            conn = conectar_banco()
-            cur = conn.cursor()
-            for (unidade, instrumento), objetivos in st.session_state.objetivos_por_instrumento.items():
+    try:
+        conn = conectar_banco()
+        cur = conn.cursor()
+        for unidade, instrumentos in instrumentos_por_unidade.items():
+            for instrumento in instrumentos:
+                objetivos = st.session_state["objetivos_por_instrumento"].get((unidade, instrumento), [])
                 for objetivo in objetivos:
-                    if objetivo.strip():
-                        cur.execute(
-                            """
-                            INSERT INTO vinculacoes (usuario, setor, unidade, instrumento, objetivo, preenchido_em)
-                            VALUES (%s, %s, %s, %s, %s, %s)
-                            """,
-                            (usuario, setor_escolhido, unidade, instrumento, objetivo, datetime.now())
-                        )
-            conn.commit()
-            conn.close()
-            st.success("Dados salvos com sucesso!")
-        except Exception as e:
-            st.error(f"Erro ao salvar os dados: {e}")
+                    eixos = eixos_por_objetivo.get((unidade, instrumento, objetivo), [])
+                    for eixo in eixos:
+                        acoes = acoes_por_eixo.get((unidade, instrumento, objetivo, eixo), [])
+                        if acoes:
+                            for acao in acoes:
+                                cur.execute(
+                                    """
+                                    INSERT INTO vinculacoes (usuario, setor, unidade, instrumento, objetivo, eixo_tematico, acao_manejo, preenchido_em)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                                    """,
+                                    (
+                                        usuario,
+                                        setor_escolhido,
+                                        unidade,
+                                        instrumento,
+                                        objetivo,
+                                        eixo,
+                                        acao,
+                                        datetime.now(),
+                                    ),
+                                )
+                        else:
+                            # Caso não haja ações de manejo selecionadas, ainda assim pode-se inserir o registro com 'Nenhuma'
+                            cur.execute(
+                                """
+                                INSERT INTO vinculacoes (usuario, setor, unidade, instrumento, objetivo, eixo_tematico, acao_manejo, preenchido_em)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                                """,
+                                (
+                                    usuario,
+                                    setor_escolhido,
+                                    unidade,
+                                    instrumento,
+                                    objetivo,
+                                    eixo,
+                                    'Nenhuma',
+                                    datetime.now(),
+                                ),
+                            )
+        conn.commit()
+        cur.close()
+        conn.close()
+        st.success("Dados salvos com sucesso!")
+    except Exception as e:
+        st.error(f"Erro ao salvar os dados: {e}")
 
 # Botão de salvamento
-if setor_escolhido and unidades_selecionadas:
-    if st.button("Salvar Vinculações"):
-        salvar_vinculacoes()
-else:
-    st.warning("Complete as informações antes de salvar.")
+if st.button("Salvar Vinculações"):
+    salvar_vinculacoes()

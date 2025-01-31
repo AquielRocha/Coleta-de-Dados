@@ -1,5 +1,7 @@
 import streamlit as st
 import psycopg2
+import pandas as pd
+from io import BytesIO
 from datetime import datetime
 
 # Função para conectar ao banco de dados PostgreSQL
@@ -83,8 +85,11 @@ for unidade, instrumentos in instrumentos_por_unidade.items():
         with col2:
             if st.button("Adicionar", key=f"add_obj_{unidade}_{instrumento}"):
                 if novo_objetivo.strip():
-                    st.session_state["objetivos_por_instrumento"][chave].append(novo_objetivo.strip())
-                    st.session_state["objetivos_inputs"][chave] = ""
+                    if novo_objetivo.strip() not in st.session_state["objetivos_por_instrumento"][chave]:
+                        st.session_state["objetivos_por_instrumento"][chave].append(novo_objetivo.strip())
+                        st.session_state["objetivos_inputs"][chave] = ""
+                    else:
+                        st.warning("Este objetivo já foi adicionado.")
                 else:
                     st.warning("Por favor, insira um objetivo válido antes de adicionar.")
 
@@ -93,11 +98,13 @@ for unidade, instrumentos in instrumentos_por_unidade.items():
         if objetivos_atualizados:
             st.write("**Objetivos Adicionados:**")
             for idx, obj in enumerate(objetivos_atualizados, 1):
-                st.write(f"{idx}. {obj}")
-                # Opção para remover um objetivo
-                if st.button(f"Remover", key=f"remove_obj_{unidade}_{instrumento}_{idx}"):
-                    st.session_state["objetivos_por_instrumento"][chave].pop(idx-1)
-                    st.experimental_rerun()
+                col3, col4 = st.columns([10, 1])
+                with col3:
+                    st.write(f"{idx}. {obj}")
+                with col4:
+                    if st.button("Remover", key=f"remove_obj_{unidade}_{instrumento}_{idx}"):
+                        st.session_state["objetivos_por_instrumento"][chave].pop(idx-1)
+                        st.experimental_rerun()
 
 # Seleção de Eixos Temáticos
 eixos_por_objetivo = {}
@@ -145,6 +152,50 @@ if setor_escolhido and unidades_selecionadas:
 else:
     st.warning("Nenhum dado preenchido para exibição.")
 
+# Função para exportar dados para Excel
+def exportar_para_excel(dados):
+    df = pd.DataFrame(dados, columns=["Setor", "Unidade", "Instrumento", "Objetivo", "Eixo Temático", "Ação de Manejo", "Usuário", "Preenchido em"])
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:  # Use 'openpyxl' aqui
+        df.to_excel(writer, index=False, sheet_name='Vinculações')
+    buffer.seek(0)
+    return buffer
+
+# Função para coletar os dados para exportação
+def coletar_dados_para_exportar():
+    dados = []
+    for unidade, instrumentos in instrumentos_por_unidade.items():
+        for instrumento in instrumentos:
+            objetivos = st.session_state["objetivos_por_instrumento"].get((unidade, instrumento), [])
+            for objetivo in objetivos:
+                eixos = eixos_por_objetivo.get((unidade, instrumento, objetivo), [])
+                for eixo in eixos:
+                    acoes = acoes_por_eixo.get((unidade, instrumento, objetivo, eixo), [])
+                    if acoes:
+                        for acao in acoes:
+                            dados.append([
+                                setor_escolhido,
+                                unidade,
+                                instrumento,
+                                objetivo,
+                                eixo,
+                                acao,
+                                usuario,
+                                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            ])
+                    else:
+                        dados.append([
+                            setor_escolhido,
+                            unidade,
+                            instrumento,
+                            objetivo,
+                            eixo,
+                            'Nenhuma',
+                            usuario,
+                            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        ])
+    return dados
+
 # Função para salvar os dados no banco
 def salvar_vinculacoes():
     try:
@@ -176,7 +227,7 @@ def salvar_vinculacoes():
                                     ),
                                 )
                         else:
-                            # Caso não haja ações de manejo selecionadas, ainda assim pode-se inserir o registro com 'Nenhuma'
+                            # Caso não haja ações de manejo selecionadas, insere 'Nenhuma'
                             cur.execute(
                                 """
                                 INSERT INTO vinculacoes (usuario, setor, unidade, instrumento, objetivo, eixo_tematico, acao_manejo, preenchido_em)
@@ -200,6 +251,47 @@ def salvar_vinculacoes():
     except Exception as e:
         st.error(f"Erro ao salvar os dados: {e}")
 
-# Botão de salvamento
+# Função para validar se todos os campos obrigatórios estão preenchidos
+def validar_campos():
+    if not usuario.strip():
+        st.error("O campo de usuário está vazio.")
+        return False
+    if not setor_escolhido:
+        st.error("Nenhum setor selecionado.")
+        return False
+    if not unidades_selecionadas:
+        st.error("Nenhuma unidade de conservação selecionada.")
+        return False
+    for unidade, instrumentos in instrumentos_por_unidade.items():
+        if not instrumentos:
+            st.error(f"Não há instrumentos selecionados para a unidade '{unidade}'.")
+            return False
+        for instrumento in instrumentos:
+            objetivos = st.session_state["objetivos_por_instrumento"].get((unidade, instrumento), [])
+            if not objetivos:
+                st.error(f"Não há objetivos adicionados para o instrumento '{instrumento}' na unidade '{unidade}'.")
+                return False
+            for objetivo in objetivos:
+                eixos = eixos_por_objetivo.get((unidade, instrumento, objetivo), [])
+                if not eixos:
+                    st.error(f"Não há eixos temáticos selecionados para o objetivo '{objetivo}' no instrumento '{instrumento}' na unidade '{unidade}'.")
+                    return False
+    return True
+
+# Botão de exportação para Excel
+dados_para_exportar = coletar_dados_para_exportar()
+if dados_para_exportar:
+    excel_buffer = exportar_para_excel(dados_para_exportar)
+    st.download_button(
+        label="Exportar Vinculações para Excel",
+        data=excel_buffer,
+        file_name="vinculacoes.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+# Botão de salvamento com validação
 if st.button("Salvar Vinculações"):
-    salvar_vinculacoes()
+    if validar_campos():
+        salvar_vinculacoes()
+    else:
+        st.warning("Por favor, preencha todos os campos obrigatórios antes de salvar.")

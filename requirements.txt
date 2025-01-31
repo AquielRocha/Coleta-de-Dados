@@ -1,5 +1,7 @@
 streamlit
+psycopg2-binary
 pandas
+
+fpdf
 openpyxl
-XlsxWriter
-psycopg2
+xlsxwriter 

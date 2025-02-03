@@ -14,33 +14,36 @@ def render():
         st.session_state["objetivos_inputs"] = {}
 
     st.title("Gestão de Manejo - ICMBio")
-    st.info("Preencha as informações passo a passo para registrar as vinculações de maneira completa.")
+    st.info("Preencha as informações passo a passo para registrar de maneira completa.")
 
-    # Identificação do usuário
-    usuario = st.text_input("Digite seu nome ou ID para identificar o preenchimento:")
-    if not usuario.strip():
-        st.warning("Por favor, insira seu nome ou ID antes de continuar.")
+    # Identificação do usuário via CPF
+    cpf = st.text_input("Digite seu CPF:", max_chars=11, help="Digite apenas os números do CPF (sem pontos ou traços)")
+    if not cpf.strip():
+        st.warning("Por favor, insira seu CPF antes de continuar.")
         st.stop()
 
     # Seleção do Setor
     setores = obter_dados("SELECT DISTINCT nome FROM setor")
     setor_escolhido = st.selectbox("Selecione o Setor", setores)
 
-    # Seleção de Unidades
+    # Seleção de Unidade de Conservação (única)
     unidades = obter_dados("SELECT DISTINCT nome FROM unidade_conservacao")
-    unidades_selecionadas = st.multiselect("Selecione as Unidades de Conservação", unidades)
+    unidade_selecionada = st.selectbox("Selecione a Unidade de Conservação", unidades)
 
-    # Seleção de Instrumentos
+    # Seleção de Instrumentos para a unidade selecionada
     instrumentos = obter_dados("SELECT DISTINCT nome FROM instrumento")
     instrumentos_por_unidade = {}
-    if unidades_selecionadas:
-        for unidade in unidades_selecionadas:
-            instrumentos_escolhidos = st.multiselect(f"Selecione os Instrumentos para '{unidade}'", instrumentos, key=f"inst_{unidade}")
-            instrumentos_por_unidade[unidade] = instrumentos_escolhidos
+    if unidade_selecionada:
+        instrumentos_escolhidos = st.multiselect(
+            f"Selecione os Instrumentos para '{unidade_selecionada}'",
+            instrumentos,
+            key=f"inst_{unidade_selecionada}"
+        )
+        instrumentos_por_unidade[unidade_selecionada] = instrumentos_escolhidos
 
     # Objetivos Específicos
-    for unidade, instrumentos in instrumentos_por_unidade.items():
-        for instrumento in instrumentos:
+    for unidade, instrumentos_list in instrumentos_por_unidade.items():
+        for instrumento in instrumentos_list:
             chave = (unidade, instrumento)
             if chave not in st.session_state["objetivos_por_instrumento"]:
                 st.session_state["objetivos_por_instrumento"][chave] = []
@@ -74,8 +77,8 @@ def render():
                     with col3:
                         st.write(f"{idx}. {obj}")
                     with col4:
-                        if st.button("Remover", key=f"remove_obj_{unidade}_{instrumento}_{idx}"):
-                            st.session_state["objetivos_por_instrumento"][chave].pop(idx-1)
+                        if st.button("x", key=f"remove_obj_{unidade}_{instrumento}_{idx}"):
+                            st.session_state["objetivos_por_instrumento"][chave].pop(idx - 1)
                             st.experimental_rerun()
 
     # Seleção de Eixos Temáticos
@@ -105,27 +108,26 @@ def render():
                 acoes_por_eixo[(unidade, instrumento, objetivo, eixo)] = acoes_selecionadas
 
     # Resumo das Vinculações
-    st.subheader("Resumo das Vinculações")
-    if setor_escolhido and unidades_selecionadas:
+    st.subheader("Resumo da Gestão")
+    if setor_escolhido and unidade_selecionada:
         st.write(f"**Setor Selecionado:** {setor_escolhido}")
-        for unidade in unidades_selecionadas:
-            st.write(f"### Unidade de Conservação: {unidade}")
-            for instrumento in instrumentos_por_unidade.get(unidade, []):
-                st.write(f"- **Instrumento:** {instrumento}")
-                objetivos = st.session_state["objetivos_por_instrumento"].get((unidade, instrumento), [])
-                for objetivo in objetivos:
-                    st.write(f"  - **Objetivo:** {objetivo}")
-                    eixos = eixos_por_objetivo.get((unidade, instrumento, objetivo), [])
-                    for eixo in eixos:
-                        st.write(f"    - **Eixo Temático:** {eixo}")
-                        acoes = acoes_por_eixo.get((unidade, instrumento, objetivo, eixo), [])
-                        st.write(f"      - **Ações de Manejo:** {', '.join(acoes) if acoes else 'Nenhuma'}")
+        st.write(f"### Unidade de Conservação: {unidade_selecionada}")
+        for instrumento in instrumentos_por_unidade.get(unidade_selecionada, []):
+            st.write(f"- **Instrumento:** {instrumento}")
+            objetivos = st.session_state["objetivos_por_instrumento"].get((unidade_selecionada, instrumento), [])
+            for objetivo in objetivos:
+                st.write(f"  - **Objetivo:** {objetivo}")
+                eixos = eixos_por_objetivo.get((unidade_selecionada, instrumento, objetivo), [])
+                for eixo in eixos:
+                    st.write(f"    - **Eixo Temático:** {eixo}")
+                    acoes = acoes_por_eixo.get((unidade_selecionada, instrumento, objetivo, eixo), [])
+                    st.write(f"      - **Ações de Manejo:** {', '.join(acoes) if acoes else 'Nenhuma'}")
     else:
         st.warning("Nenhum dado preenchido para exibição.")
 
     # Exportar para Excel
     dados_para_exportar = coletar_dados_para_exportar(
-        usuario,
+        cpf,
         setor_escolhido,
         instrumentos_por_unidade,
         st.session_state["objetivos_por_instrumento"],
@@ -135,24 +137,24 @@ def render():
     if dados_para_exportar:
         excel_buffer = exportar_para_excel(dados_para_exportar)
         st.download_button(
-            label="Exportar Vinculações para Excel",
+            label="Exportar para Excel",
             data=excel_buffer,
-            file_name="vinculacoes.xlsx",
+            file_name="relacao.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
     # Botão para Salvar as Vinculações
-    if st.button("Salvar Vinculações"):
+    if st.button("Salvar dados"):
         if validar_campos(
-            usuario,
+            cpf,
             setor_escolhido,
-            unidades_selecionadas,
+            unidade_selecionada,
             instrumentos_por_unidade,
             st.session_state["objetivos_por_instrumento"],
             eixos_por_objetivo
         ):
             salvar_vinculacoes(
-                usuario,
+                cpf,
                 setor_escolhido,
                 instrumentos_por_unidade,
                 st.session_state["objetivos_por_instrumento"],

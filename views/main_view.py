@@ -6,10 +6,12 @@ from controllers.vinculations_controller import salvar_vinculacoes, coletar_dado
 from utils.export_utils import exportar_para_excel
 from utils.validation import validar_campos
 
+
 def render():
-    # Inicializa os estados, se ainda não estiverem definidos.
     if "objetivos_por_instrumento" not in st.session_state:
         st.session_state["objetivos_por_instrumento"] = {}
+
+    # Verifica se a chave 'objetivos_inputs' existe, caso contrário, inicializa
     if "objetivos_inputs" not in st.session_state:
         st.session_state["objetivos_inputs"] = {}
 
@@ -22,8 +24,20 @@ def render():
         max_chars=11, 
         help="Digite somente os números do CPF, sem pontos ou traços."
     )
+    
+    # Verifica se o CPF foi preenchido
     if not cpf.strip():
         st.warning("Por favor, insira seu CPF para prosseguir.")
+        st.stop()
+
+    # Nome do Usuário
+    nome_usuario = st.text_input(
+        "Digite seu Nome Completo:",
+        help="Informe seu nome completo para o cadastro."
+    )
+    
+    if not nome_usuario.strip():
+        st.warning("Por favor, insira seu nome para prosseguir.")
         st.stop()
 
     # Seleção do Setor
@@ -179,8 +193,9 @@ def render():
         ):
             salvar_vinculacoes(
                 cpf,
-                setor_escolhido,
-                instrumentos_por_unidade,
+            nome_usuario,
+            setor_escolhido,
+            instrumentos_por_unidade,
                 st.session_state["objetivos_por_instrumento"],
                 eixos_por_objetivo,
                 acoes_por_eixo

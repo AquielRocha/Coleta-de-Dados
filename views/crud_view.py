@@ -6,7 +6,7 @@ from models.database import obter_dados
 
 def render_crud_view():
     st.markdown("<h1 style='color:#E5EFE3;'>Visualização e Gerenciamento</h1>", unsafe_allow_html=True)
-    st.info("Informe seu CPF para visualizar e gerenciar as informações de manejo. Por favor, verifique cuidadosamente os dados antes de confirmar qualquer alteração ou exclusão.")
+    st.info("Informe seu CPF para visualizar e gerenciar as informações de manejo. Somente registros vinculados ao setor do usuário serão exibidos.")
 
     # Entrada do CPF
     cpf_input = st.text_input(
@@ -22,10 +22,10 @@ def render_crud_view():
                 st.error("Por favor, insira um CPF válido.")
                 return
 
-            # Lista os registros filtrados pelo CPF
+            # Lista os registros filtrados pelo setor do usuário
             records = listar_vinculacoes(cpf=cpf_input)
             if not records:
-                st.warning("Nenhum dado encontrado para este CPF.")
+                st.warning("Nenhum dado encontrado para este CPF ou usuário não tem setor vinculado.")
                 return
 
             st.session_state["records"] = records
@@ -38,7 +38,7 @@ def render_crud_view():
     records = st.session_state["records"]
     cpf_input = st.session_state["cpf"]
 
-    # Converter os registros para DataFrame para visualização (escondendo a coluna de ID)
+    # Converter os registros para DataFrame para visualização
     df = pd.DataFrame(records, columns=[
         "ID", "CPF", "Setor", "Unidade", "Instrumento", "Objetivo", "Eixo Temático", "Ação de Manejo", "Preenchido em"
     ])

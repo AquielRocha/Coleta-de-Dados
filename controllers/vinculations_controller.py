@@ -4,16 +4,57 @@ from datetime import datetime
 from models.database import conectar_banco
 import streamlit as st
 
-def salvar_vinculacoes(usuario, setor_escolhido, instrumentos_por_unidade, 
-                         objetivos_por_instrumento, eixos_por_objetivo, acoes_por_eixo):
+
+def salvar_usuario(cpf, nome, setor):
     """
-    Insere novos registros de vinculações no banco.
-    Para cada combinação de unidade, instrumento, objetivo, eixo e ação (ou 'Nenhuma'),
-    insere um registro com a data de preenchimento.
+    Insere um novo usuário na tabela 'usuarios', se ele ainda não existir.
     """
     try:
         conn = conectar_banco()
         cur = conn.cursor()
+
+        # Verificar se o usuário já existe
+        cur.execute("SELECT id FROM usuarios WHERE cpf = %s", (cpf,))
+        usuario_existente = cur.fetchone()
+
+        if not usuario_existente:
+            # Obter o ID do setor escolhido
+            cur.execute("SELECT id FROM setor WHERE nome = %s", (setor,))
+            setor_id = cur.fetchone()
+
+            if not setor_id:
+                st.error("Setor não encontrado no banco de dados.")
+                return
+            
+            setor_id = setor_id[0]
+
+            # Inserir novo usuário
+            cur.execute("""
+                INSERT INTO usuarios (cpf, nome, setor_id)
+                VALUES (%s, %s, %s)
+            """, (cpf, nome, setor_id))
+            conn.commit()
+            st.success(f"Usuário {nome} cadastrado com sucesso!")
+
+        cur.close()
+        conn.close()
+
+    except Exception as e:
+        st.error(f"Erro ao salvar usuário: {e}")
+
+
+def salvar_vinculacoes(cpf, nome_usuario, setor_escolhido, instrumentos_por_unidade, 
+                         objetivos_por_instrumento, eixos_por_objetivo, acoes_por_eixo):
+    """
+    Insere novos registros de vinculações no banco, garantindo que o usuário esteja cadastrado.
+    """
+    try:
+        conn = conectar_banco()
+        cur = conn.cursor()
+
+        # Garantir que o usuário está cadastrado
+        salvar_usuario(cpf, nome_usuario, setor_escolhido)
+
         for unidade, instrumentos in instrumentos_por_unidade.items():
             for instrumento in instrumentos:
                 objetivos = objetivos_por_instrumento.get((unidade, instrumento), [])
@@ -30,7 +71,7 @@ def salvar_vinculacoes(usuario, setor_escolhido, instrumentos_por_unidade,
                                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                                     """,
                                     (
-                                        usuario,
+                                        cpf,
                                         setor_escolhido,
                                         unidade,
                                         instrumento,
@@ -48,7 +89,7 @@ def salvar_vinculacoes(usuario, setor_escolhido, instrumentos_por_unidade,
                                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                                 """,
                                 (
-                                    usuario,
+                                    cpf,
                                     setor_escolhido,
                                     unidade,
                                     instrumento,
@@ -58,10 +99,12 @@ def salvar_vinculacoes(usuario, setor_escolhido, instrumentos_por_unidade,
                                     datetime.now(),
                                 ),
                             )
+
         conn.commit()
         cur.close()
         conn.close()
-        st.success("Dados salvos com sucesso!")
+        st.success("Dados de vinculação salvos com sucesso!")
+
     except Exception as e:
         st.error(f"Erro ao salvar os dados: {e}")
 
@@ -106,29 +149,40 @@ def coletar_dados_para_exportar(usuario, setor_escolhido, instrumentos_por_unida
 
 def listar_vinculacoes(cpf=None):
     """
-    Retorna todas as vinculações cadastradas.
-    Se o parâmetro cpf (armazenado no campo "usuario") for informado, filtra somente os registros desse CPF.
+    Retorna todas as vinculações cadastradas para um usuário filtrando pelo setor ao qual ele pertence.
+    Se o parâmetro cpf for informado, retorna somente os registros relacionados ao setor do usuário.
     """
     try:
         conn = conectar_banco()
         cur = conn.cursor()
-        if cpf:
-            cur.execute("""
-                SELECT id, usuario, setor, unidade, instrumento, objetivo, eixo_tematico, acao_manejo, preenchido_em
-                FROM vinculacoes
-                WHERE usuario = %s
-                ORDER BY id
-            """, (cpf,))
-        else:
-            cur.execute("""
-                SELECT id, usuario, setor, unidade, instrumento, objetivo, eixo_tematico, acao_manejo, preenchido_em
-                FROM vinculacoes
-                ORDER BY id
-            """)
+        
+        # Buscar setor do usuário pelo CPF
+        cur.execute("""
+            SELECT setor.nome FROM usuarios 
+            JOIN setor ON usuarios.setor_id = setor.id 
+            WHERE usuarios.cpf = %s
+        """, (cpf,))
+        setor_usuario = cur.fetchone()
+
+        if not setor_usuario:
+            st.warning("Usuário não encontrado ou não associado a um setor.")
+            return []
+
+        setor_usuario = setor_usuario[0]
+
+        # Buscar as vinculações apenas do setor do usuário
+        cur.execute("""
+            SELECT id, usuario, setor, unidade, instrumento, objetivo, eixo_tematico, acao_manejo, preenchido_em
+            FROM vinculacoes
+            WHERE setor = %s
+            ORDER BY id
+        """, (setor_usuario,))
+
         records = cur.fetchall()
         cur.close()
         conn.close()
         return records
+
     except Exception as e:
         st.error(f"Erro ao listar as vinculações: {e}")
         return []

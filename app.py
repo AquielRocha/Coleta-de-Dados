@@ -43,7 +43,7 @@ def main():
     )
     
     # Cabeçalho centralizado
-    st.markdown("<h1 class='main-header'>Gestão de Manejo - ICMBio</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='main-header' style='color:#E5EFE3;'>Gestão de Manejo - ICMBio</h1>", unsafe_allow_html=True)
     
     # Se desejar, você pode incluir um logo na sidebar
     # st.sidebar.image("logo.png", width=200)

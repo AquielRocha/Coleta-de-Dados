@@ -5,7 +5,7 @@ from controllers.vinculations_controller import listar_vinculacoes, editar_vincu
 from models.database import obter_dados
 
 def render_crud_view():
-    st.title("Visualização e Gerenciamento")
+    st.markdown("<h1 style='color:#E5EFE3;'>Visualização e Gerenciamento</h1>", unsafe_allow_html=True)
     st.info("Informe seu CPF para visualizar e gerenciar as informações de manejo. Por favor, verifique cuidadosamente os dados antes de confirmar qualquer alteração ou exclusão.")
 
     # Entrada do CPF

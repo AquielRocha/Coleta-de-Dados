@@ -4,73 +4,65 @@ import pandas as pd
 from controllers.vinculations_controller import listar_vinculacoes, editar_vinculacao, deletar_vinculacao
 from models.database import obter_dados
 
-def render_crud_view():
-    st.markdown("<h1 style='color:#E5EFE3;'>Visualização e Gerenciamento</h1>", unsafe_allow_html=True)
-    st.info("Informe seu CPF para visualizar e gerenciar as informações de manejo. Somente registros vinculados ao setor do usuário serão exibidos.")
+def carregar_registros(cpf_input):
+    """
+    Carrega os registros do usuário a partir do CPF informado.
+    """
+    if not cpf_input.strip():
+        st.error("Por favor, insira um CPF válido.")
+        return None
+    records = listar_vinculacoes(cpf=cpf_input)
+    if not records:
+        st.warning("Nenhum dado encontrado para este CPF ou usuário não tem setor vinculado.")
+        return None
+    return records
 
-    # Entrada do CPF
-    cpf_input = st.text_input(
-        "Digite seu CPF:", 
-        max_chars=11, 
-        help="Somente números, sem pontos ou traços."
-    )
-
-    # Se os dados ainda não foram carregados, exibe o botão para carregamento
-    if "records" not in st.session_state:
-        if st.button("Carregar dados do Usuário"):
-            if cpf_input.strip() == "":
-                st.error("Por favor, insira um CPF válido.")
-                return
-
-            # Lista os registros filtrados pelo setor do usuário
-            records = listar_vinculacoes(cpf=cpf_input)
-            if not records:
-                st.warning("Nenhum dado encontrado para este CPF ou usuário não tem setor vinculado.")
-                return
-
-            st.session_state["records"] = records
-            st.session_state["cpf"] = cpf_input
-        else:
-            # Se o botão ainda não foi clicado, encerra a função
-            return
-
-    # Se os dados já foram carregados, utiliza-os
-    records = st.session_state["records"]
-    cpf_input = st.session_state["cpf"]
-
-    # Converter os registros para DataFrame para visualização
+def exibir_registros(records):
+    """
+    Exibe os registros em formato de tabela, ocultando o ID para visualização.
+    """
     df = pd.DataFrame(records, columns=[
         "ID", "CPF", "Setor", "Unidade", "Instrumento", "Objetivo", "Eixo Temático", "Ação de Manejo", "Preenchido em"
     ])
-    if "ID" in df.columns:
-        df = df.drop(columns=["ID"])
-    st.subheader("Seus Registros de Manejo")
-    st.dataframe(df, use_container_width=True)
+    # Cria uma cópia sem a coluna "ID" para exibição
+    df_exibicao = df.drop(columns=["ID"])
+    st.subheader("Registros de Manejo do seu setor")
+    st.dataframe(df_exibicao, use_container_width=True)
 
-    st.markdown("---")
-    st.subheader("Editar / Deletar Registros")
-
-    # Cria um dicionário para associar uma label descritiva a cada registro (não exibe o ID para o usuário)
-    options = {
-        f"{r[3]} | {r[4]} | {r[5]}": r   # r[3]: Unidade, r[4]: Instrumento, r[5]: Objetivo
-        for r in records
-    }
-    selected_label = st.selectbox("Selecione o registro que deseja editar:", list(options.keys()), 
-                                  help="Selecione o registro correspondente à informação que você deseja alterar.")
-    selected_record = options[selected_label]
-
-    st.markdown("### Dados Selecionados para Edição")
-    st.write("Confira os dados abaixo. O campo CPF é somente leitura. Você pode alterar os demais campos se necessário.")
-    st.text_input("CPF (somente leitura)", value=selected_record[1], disabled=True)
-
-    # Carrega as opções para cada campo a partir do banco de dados
+def obter_opcoes_cadastro():
+    """
+    Obtém as opções para cada campo a partir do banco de dados.
+    """
     setores_options      = obter_dados("SELECT DISTINCT nome FROM setor")
     unidades_options     = obter_dados("SELECT DISTINCT nome FROM unidade_conservacao")
     instrumentos_options = obter_dados("SELECT DISTINCT nome FROM instrumento")
     eixos_options        = obter_dados("SELECT DISTINCT nome FROM eixo_tematico")
     acoes_options        = obter_dados("SELECT DISTINCT nome FROM acao_manejo")
+    return setores_options, unidades_options, instrumentos_options, eixos_options, acoes_options
 
-    # Campo "Setor" com selectbox
+def render_edit_delete_form(records):
+    """
+    Renderiza o formulário para edição e deleção dos registros.
+    """
+    # Cria um dicionário de opções para seleção do registro
+    options = {
+        f"Unidade: {r[3]} | Instrumento: {r[4]} | Objetivo: {r[5]}": r
+        for r in records
+    }
+    selected_label = st.selectbox(
+        "Selecione o registro que deseja editar:",
+        list(options.keys()),
+        help="Selecione o registro correspondente à informação que você deseja alterar."
+    )
+    selected_record = options[selected_label]
+
+    st.markdown("### Dados Selecionados para Edição")
+    st.write("Confira os dados abaixo. O campo CPF é somente leitura. Você pode alterar os demais campos, se necessário.")
+    st.text_input("CPF (somente leitura)", value=selected_record[1], disabled=True)
+
+    # Carrega as opções para cada campo
+    setores_options, unidades_options, instrumentos_options, eixos_options, acoes_options = obter_opcoes_cadastro()
+
     try:
         setor = st.selectbox(
             "Selecione o Setor",
@@ -82,7 +74,6 @@ def render_crud_view():
         st.error(f"Erro ao carregar o setor: {e}")
         setor = selected_record[2]
 
-    # Campo "Unidade de Conservação" com selectbox
     try:
         unidade = st.selectbox(
             "Selecione a Unidade de Conservação",
@@ -94,7 +85,6 @@ def render_crud_view():
         st.error(f"Erro ao carregar a unidade: {e}")
         unidade = selected_record[3]
 
-    # Campo "Instrumento" com selectbox
     try:
         instrumento = st.selectbox(
             "Selecione o Instrumento",
@@ -106,14 +96,13 @@ def render_crud_view():
         st.error(f"Erro ao carregar o instrumento: {e}")
         instrumento = selected_record[4]
 
-    # Campo "Objetivo" como text_input para permitir edição livre
+    # Campo "Objetivo" como entrada de texto livre
     objetivo = st.text_input(
         "Digite o Objetivo", 
         value=selected_record[5],
         help="Edite o objetivo conforme necessário. Este campo permite entrada livre de texto."
     )
 
-    # Campo "Eixo Temático" com selectbox
     try:
         eixo_tematico = st.selectbox(
             "Selecione o Eixo Temático",
@@ -125,7 +114,6 @@ def render_crud_view():
         st.error(f"Erro ao carregar o eixo temático: {e}")
         eixo_tematico = selected_record[6]
 
-    # Campo "Ação de Manejo" com selectbox
     try:
         acao_manejo = st.selectbox(
             "Selecione a Ação de Manejo",
@@ -138,36 +126,65 @@ def render_crud_view():
         acao_manejo = selected_record[7]
 
     st.markdown("### Confirmação")
-    st.info("Revise os dados alterados e confirme a operação desejada abaixo.")
+    st.info("Revise os dados alterados abaixo.")
 
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Salvar Alterações"):
-            if st.checkbox("Confirmo que desejo salvar as alterações", key="confirm_save", help="Marque esta opção para confirmar que deseja salvar as alterações feitas."):
-                editar_vinculacao(
-                    selected_record[0],
-                    setor,
-                    unidade,
-                    instrumento,
-                    objetivo,
-                    eixo_tematico,
-                    acao_manejo
-                )
-                st.success("Alterações salvas com sucesso!")
-                # Limpa os registros para recarregar os dados na próxima ação
-                if "records" in st.session_state:
-                    del st.session_state["records"]
-                st.experimental_rerun()
-            else:
-                st.warning("Por favor, confirme que deseja salvar as alterações.")
-
+            editar_vinculacao(
+                selected_record[0],
+                setor,
+                unidade,
+                instrumento,
+                objetivo,
+                eixo_tematico,
+                acao_manejo
+            )
+            st.success("Alterações salvas com sucesso!")
+            if "records" in st.session_state:
+                del st.session_state["records"]
     with col2:
         if st.button("Deletar Registro"):
-            if st.checkbox("Confirmo que desejo deletar este registro", key="confirm_delete", help="Marque esta opção para confirmar a exclusão do registro selecionado."):
+            if st.checkbox(
+                "Confirmo que desejo deletar este registro",
+                key="confirm_delete",
+                help="Marque esta opção para confirmar a exclusão do registro selecionado."
+            ):
                 deletar_vinculacao(selected_record[0])
                 st.success("Registro deletado com sucesso!")
                 if "records" in st.session_state:
                     del st.session_state["records"]
-                st.experimental_rerun()
             else:
                 st.warning("Por favor, confirme que deseja deletar este registro.")
+
+def render_crud_view():
+    st.markdown("<h1 style='color:#E5EFE3;'>Visualização e Gerenciamento</h1>", unsafe_allow_html=True)
+    st.info("Informe seu CPF para visualizar e gerenciar as informações de manejo. Somente registros vinculados ao setor do usuário serão exibidos.")
+
+    # Entrada do CPF
+    cpf_input = st.text_input(
+        "Digite seu CPF:", 
+        max_chars=11, 
+        help="Somente números, sem pontos ou traços."
+    )
+
+    # Se os registros ainda não foram carregados, exibe o botão para carregá-los
+    if "records" not in st.session_state:
+        if st.button("Carregar dados do Usuário"):
+            records = carregar_registros(cpf_input)
+            if records is None:
+                return
+            st.session_state["records"] = records
+            st.session_state["cpf"] = cpf_input
+        else:
+            return
+
+    # Utiliza os registros já carregados
+    records = st.session_state["records"]
+
+    # Exibe os registros em tabela
+    exibir_registros(records)
+
+    st.markdown("---")
+    st.subheader("Editar / Deletar Registros")
+    render_edit_delete_form(records)

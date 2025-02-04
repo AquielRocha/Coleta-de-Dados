@@ -160,15 +160,15 @@ def render():
     if dados_para_exportar:
         excel_buffer = exportar_para_excel(dados_para_exportar)
         st.download_button(
-            label="Exportar Vinculações para Excel",
+            label="Exportar Dados para Excel",
             data=excel_buffer,
-            file_name="vinculacoes.xlsx",
+            file_name="relacao.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             help="Clique para baixar um arquivo Excel com os dados preenchidos."
         )
 
     # Botão para Salvar as Vinculações
-    if st.button("Salvar Vinculações"):
+    if st.button("Salvar Dados"):
         if validar_campos(
             cpf,
             setor_escolhido,

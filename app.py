@@ -5,6 +5,8 @@ def main():
     st.set_page_config(page_title="Gestão de Manejo - ICMBio", layout="wide")
     
     # Injetando CSS customizado para melhorar a aparência
+
+    
     st.markdown(
         """
         <style>

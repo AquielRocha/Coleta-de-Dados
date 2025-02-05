@@ -26,6 +26,8 @@ def update_usuario_setor(cpf, novo_setor):
     except Exception as e:
         st.error(f"Erro ao atualizar setor do usuário: {e}")
 
+
+
 def render_identificacao():
     cpf = st.text_input(
         "Digite seu CPF:",
@@ -69,25 +71,19 @@ def render_identificacao():
             key="nome_usuario"
         ).strip()
 
-        # Agora pedimos só 1 coluna (nome) e queremos que seja uma lista simples de strings:
         setores = obter_dados("SELECT DISTINCT nome FROM setor", single_column=True)
-
         setor = st.selectbox(
             "Selecione o Setor",
             setores,
             help="Escolha o setor onde a atividade ocorrerá.",
             key="setor_selectbox"
         )
-        # Armazena o setor escolhido para novos usuários
         st.session_state["setor_registrado"] = setor
 
     return cpf, nome_usuario, st.session_state["setor_registrado"]
 
 def render_setor_unidade():
-    # Novamente, single_column=True para retornar lista de strings
     setores = obter_dados("SELECT DISTINCT nome FROM setor", single_column=True)
-
-    # Para usuários cadastrados, oferecemos a opção de mudar de setor.
     if st.session_state.get("user_registrado"):
         atual = st.session_state["setor_registrado"]
         st.info(f"Setor atual: {atual}.")
@@ -107,12 +103,9 @@ def render_setor_unidade():
         else:
             setor_escolhido = atual
     else:
-        # Para usuários não cadastrados, usa o setor já selecionado na identificação.
         setor_escolhido = st.session_state.get("setor_registrado")
 
-    # Consulta as unidades de conservação, single_column=True para retorno só do nome
     unidades = obter_dados("SELECT DISTINCT nome FROM unidade_conservacao", single_column=True)
-
     unidade_selecionada = st.selectbox(
         "Selecione a Unidade de Conservação",
         unidades,
@@ -123,7 +116,6 @@ def render_setor_unidade():
 
 def render_instrumentos(unidade_selecionada):
     instrumentos_por_unidade = {}
-    # Consulta de instrumento, single_column=True
     instrumentos = obter_dados("SELECT DISTINCT nome FROM instrumento", single_column=True)
 
     if unidade_selecionada:
@@ -134,6 +126,7 @@ def render_instrumentos(unidade_selecionada):
             help="Selecione um ou mais instrumentos conforme aplicável."
         )
         instrumentos_por_unidade[unidade_selecionada] = instrumentos_escolhidos
+
     return instrumentos_por_unidade
 
 def render_objetivos(instrumentos_por_unidade):
@@ -179,7 +172,7 @@ def render_objetivos(instrumentos_por_unidade):
                     col3, col4 = st.columns([10, 1])
                     with col3:
                         st.write(f"{idx}. {obj}")
-                    with col4:
+                    with col2:
                         if st.button("Remover", key=f"remove_obj_{unidade}_{instrumento}_{idx}_button"):
                             st.session_state["objetivos_por_instrumento"][chave].pop(idx - 1)
 
@@ -191,7 +184,6 @@ def render_eixos(objetivos_por_instrumento):
     st.info("Selecione os eixos temáticos relacionados aos objetivos específicos acima.")
 
     eixos_por_objetivo = {}
-    # Lê os eixos, single_column=True, pois seleciona 1 coluna (nome)
     eixos = obter_dados("SELECT nome FROM eixo_tematico", single_column=True)
 
     if objetivos_por_instrumento:
@@ -219,7 +211,6 @@ def render_acoes(eixos_por_objetivo):
                 st.write(f"Buscando ações para o eixo: '{eixo}'")
 
                 try:
-                    # Query que retorna (id, nome) → duas colunas
                     acoes_relacionadas = obter_dados(
                         """
                         SELECT am.id, am.nome
@@ -228,36 +219,30 @@ def render_acoes(eixos_por_objetivo):
                           JOIN eixo_tematico et ON et.id = ea.eixo_id
                          WHERE et.nome = %s
                         """,
-                        (eixo,)  # Usando parameter binding
+                        (eixo,)
                     )
                 except Exception as e:
                     st.error(f"Ocorreu um erro na consulta ao eixo '{eixo}': {e}")
                     st.stop()
 
-                # Se não houver erro, mas vier vazio:
                 if not acoes_relacionadas:
                     st.warning(f"Não foram encontradas ações de manejo para o eixo '{eixo}'.")
                     continue
 
-                # Verifica formato: lista de tuplas (id, nome)
+                # Verifica se o retorno está no formato adequado: lista de tuplas (id, nome)
                 formato_ok = (
                     isinstance(acoes_relacionadas, list)
                     and all(isinstance(acao, tuple) and len(acao) == 2 for acao in acoes_relacionadas)
                 )
 
                 if formato_ok:
-                    # Monta dicionário {id: nome}
                     acoes_dict = {acao[0]: acao[1] for acao in acoes_relacionadas}
-
-                    # Exibe multiselect para escolher quais ações
                     acoes_selecionadas = st.multiselect(
                         f"Selecione as ações para o eixo: '{eixo}' (Objetivo: {objetivo})",
                         options=list(acoes_dict.values()),
                         key=f"acao_{unidade}_{instrumento}_{objetivo}_{eixo}_multiselect",
                         help="Selecione as ações de manejo que se aplicam a este eixo temático."
                     )
-
-                    # Guarda só os IDs das selecionadas
                     acoes_por_eixo[(unidade, instrumento, objetivo, eixo)] = [
                         key for key, value in acoes_dict.items() if value in acoes_selecionadas
                     ]
@@ -271,27 +256,45 @@ def render_acoes(eixos_por_objetivo):
 def render_resumo(setor_escolhido, unidade_selecionada,
                   instrumentos_por_unidade, objetivos_por_instrumento,
                   eixos_por_objetivo, acoes_por_eixo):
+    """
+    Monta um resumo em formato hierárquico para visualização.
+    """
     st.markdown("<hr>", unsafe_allow_html=True)
     st.markdown("<h2 style='font-size:24px; color:#E6F0F3;'>Resumo das Vinculações</h2>", unsafe_allow_html=True)
 
-    st.write(f"<b>Setor Selecionado:</b> {setor_escolhido}", unsafe_allow_html=True)
-    st.write(f"<b>Unidade de Conservação:</b> {unidade_selecionada}", unsafe_allow_html=True)
+    # Iniciamos com algumas informações básicas
+    resumo_md = f"""
+**Setor Selecionado**: {setor_escolhido}  
+**Unidade de Conservação**: {unidade_selecionada}
 
+"""
+
+    # Para cada Unidade → Instrumentos → Objetivos → Eixos → Ações
     for unidade in instrumentos_por_unidade:
-        for instrumento in instrumentos_por_unidade.get(unidade, []):
-            st.write(f"<b>Instrumento:</b> {instrumento}", unsafe_allow_html=True)
+        instrumentos = instrumentos_por_unidade.get(unidade, [])
+        if not instrumentos:
+            continue
+
+        for instrumento in instrumentos:
+            resumo_md += f"- **Instrumento**: {instrumento}\n"
             objetivos = objetivos_por_instrumento.get((unidade, instrumento), [])
-            for objetivo in objetivos:
-                st.write(f" - <b>Objetivo:</b> {objetivo}", unsafe_allow_html=True)
-                eixos = eixos_por_objetivo.get((unidade, instrumento, objetivo), [])
-                for eixo in eixos:
-                    st.write(f"   - <b>Eixo Temático:</b> {eixo}", unsafe_allow_html=True)
-                    acoes = acoes_por_eixo.get((unidade, instrumento, objetivo, eixo), [])
-                    if acoes:
-                        acoes_str = ", ".join(map(str, acoes))
-                    else:
-                        acoes_str = "Nenhuma"
-                    st.write(f"     - <b>Ações de Manejo:</b> {acoes_str}", unsafe_allow_html=True)
+            if objetivos:
+                for obj in objetivos:
+                    resumo_md += f"  - **Objetivo**: {obj}\n"
+                    eixos = eixos_por_objetivo.get((unidade, instrumento, obj), [])
+                    if eixos:
+                        for eixo in eixos:
+                            resumo_md += f"    - **Eixo Temático**: {eixo}\n"
+                            acoes = acoes_por_eixo.get((unidade, instrumento, obj, eixo), [])
+                            if acoes:
+                                acoes_str = ", ".join(map(str, acoes))
+                                resumo_md += f"      - **Ações de Manejo**: {acoes_str}\n"
+                            else:
+                                resumo_md += "      - **Ações de Manejo**: Nenhuma\n"
+
+    # Exibe tudo ao final
+    st.markdown(resumo_md, unsafe_allow_html=True)
+
 
 def render():
     st.markdown("<h1 style='color:#E5EFE3;'>Gestão de Manejo - ICMBio</h1>", unsafe_allow_html=True)

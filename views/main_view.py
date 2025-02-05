@@ -5,12 +5,12 @@ from controllers.vinculations_controller import salvar_vinculacoes, coletar_dado
 from utils.export_utils import exportar_para_excel
 from utils.validation import validar_campos
 
-
 def render_identificacao():
     cpf = st.text_input(
         "Digite seu CPF:", 
         max_chars=11, 
-        help="Digite somente os números do CPF, sem pontos ou traços."
+        help="Digite somente os números do CPF, sem pontos ou traços.",
+        key="cpf_input"
     ).strip()
     
     if not cpf:
@@ -36,36 +36,41 @@ def render_identificacao():
         # Usuário já cadastrado: nome e setor são automaticamente preenchidos
         nome_usuario, setor = usuario
         st.info(f"Bem-vindo de volta, {nome_usuario}! ")
-        st.text_input("Nome", value=nome_usuario, disabled=True)
-        st.text_input("Setor", value=setor, disabled=True)
+        st.text_input("Nome", value=nome_usuario, disabled=True, key="nome_usuario_input")
+        st.text_input("Setor", value=setor, disabled=True, key="setor_usuario_input")
     else:
         # Usuário não cadastrado: solicitar os dados
         nome_usuario = st.text_input(
             "Digite seu Nome Completo:",
-            help="Informe seu nome completo para o cadastro."
+            help="Informe seu nome completo para o cadastro.",
+            key="nome_usuario"
         ).strip()
         # Recupera as opções de setor para cadastro
         setores = obter_dados("SELECT DISTINCT nome FROM setor")
         setor = st.selectbox(
             "Selecione o Setor", 
             setores, 
-            help="Escolha o setor onde a atividade ocorrerá."
+            help="Escolha o setor onde a atividade ocorrerá.",
+            key="setor_selectbox"
         )
 
     return cpf, nome_usuario, setor
+
 def render_setor_unidade():
     setores = obter_dados("SELECT DISTINCT nome FROM setor")
     setor_escolhido = st.selectbox(
         "Selecione o Setor",
         setores,
-        help="Escolha o setor onde a atividade ocorrerá."
+        help="Escolha o setor onde a atividade ocorrerá.",
+        key="setor_unidade_selectbox"
     )
 
     unidades = obter_dados("SELECT DISTINCT nome FROM unidade_conservacao")
     unidade_selecionada = st.selectbox(
         "Selecione a Unidade de Conservação",
         unidades,
-        help="Selecione a unidade relacionada à atividade."
+        help="Selecione a unidade relacionada à atividade.",
+        key="unidade_conservacao_selectbox"
     )
     return setor_escolhido, unidade_selecionada
 
@@ -76,7 +81,7 @@ def render_instrumentos(unidade_selecionada):
         instrumentos_escolhidos = st.multiselect(
             f"Selecione os Instrumentos para '{unidade_selecionada}'",
             instrumentos,
-            key=f"inst_{unidade_selecionada}",
+            key=f"inst_{unidade_selecionada}_multiselect",
             help="Selecione um ou mais instrumentos conforme aplicável."
         )
         instrumentos_por_unidade[unidade_selecionada] = instrumentos_escolhidos
@@ -106,11 +111,11 @@ def render_objetivos(instrumentos_por_unidade):
             with col1:
                 novo_objetivo = st.text_input(
                     "Digite um objetivo específico:",
-                    key=f"novo_obj_{unidade}_{instrumento}",
+                    key=f"novo_obj_{unidade}_{instrumento}_input",
                     help="Insira um objetivo específico para este instrumento."
                 )
             with col2:
-                if st.button("Adicionar", key=f"add_obj_{unidade}_{instrumento}"):
+                if st.button("Adicionar", key=f"add_obj_{unidade}_{instrumento}_button"):
                     if novo_objetivo.strip():
                         if novo_objetivo.strip() not in st.session_state["objetivos_por_instrumento"][chave]:
                             st.session_state["objetivos_por_instrumento"][chave].append(novo_objetivo.strip())
@@ -127,7 +132,7 @@ def render_objetivos(instrumentos_por_unidade):
                     with col3:
                         st.write(f"{idx}. {obj}")
                     with col4:
-                        if st.button("Remover", key=f"remove_obj_{unidade}_{instrumento}_{idx}"):
+                        if st.button("Remover", key=f"remove_obj_{unidade}_{instrumento}_{idx}_button"):
                             st.session_state["objetivos_por_instrumento"][chave].pop(idx - 1)
                             st.experimental_rerun()
 
@@ -145,7 +150,7 @@ def render_eixos(objetivos_por_instrumento):
                 eixos_selecionados = st.multiselect(
                     f"Selecione os eixos para o objetivo: '{objetivo}' no instrumento: '{instrumento}'",
                     eixos,
-                    key=f"eixo_{unidade}_{instrumento}_{objetivo}",
+                    key=f"eixo_{unidade}_{instrumento}_{objetivo}_multiselect",
                     help="Selecione os eixos temáticos que se aplicam a este objetivo."
                 )
                 eixos_por_objetivo[(unidade, instrumento, objetivo)] = eixos_selecionados
@@ -163,7 +168,7 @@ def render_acoes(eixos_por_objetivo):
                 acoes_selecionadas = st.multiselect(
                     f"Selecione as ações para o eixo: '{eixo}' (Objetivo: {objetivo})",
                     acoes,
-                    key=f"acao_{unidade}_{instrumento}_{objetivo}_{eixo}",
+                    key=f"acao_{unidade}_{instrumento}_{objetivo}_{eixo}_multiselect",
                     help="Selecione as ações de manejo que se aplicam a este eixo temático."
                 )
                 acoes_por_eixo[(unidade, instrumento, objetivo, eixo)] = acoes_selecionadas
@@ -196,7 +201,6 @@ def render():
 
     # Identificação do usuário
     cpf, nome_usuario, setor = render_identificacao()
-
 
     # Seleção de Setor e Unidade de Conservação
     setor_escolhido, unidade_selecionada = render_setor_unidade()
@@ -252,8 +256,7 @@ def render():
                 setor_escolhido,
                 instrumentos_por_unidade,
                 objetivos_por_instrumento,
-                eixos_por_objetivo,
-                acoes_por_eixo
+                eixos_por_eixo
             )
         else:
             st.warning("Por favor, preencha todos os campos obrigatórios antes de salvar.")

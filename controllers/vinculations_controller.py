@@ -1,5 +1,3 @@
-# controllers/vinculations_controller.py
-
 from datetime import datetime
 from models.database import conectar_banco
 import streamlit as st
@@ -29,13 +27,18 @@ def salvar_usuario(cpf, nome, setor):
             setor_id = get_id(cur, 'setor', 'nome', setor)
             if not setor_id:
                 st.error("Setor não encontrado no banco de dados.")
+                cur.close()
+                conn.close()
                 return
             
             # Inserir novo usuário
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO usuarios (cpf, nome, setor_id)
                 VALUES (%s, %s, %s)
-            """, (cpf, nome, setor_id))
+                """,
+                (cpf, nome, setor_id)
+            )
             conn.commit()
             st.success(f"Usuário {nome} cadastrado com sucesso!")
 
@@ -45,8 +48,10 @@ def salvar_usuario(cpf, nome, setor):
     except Exception as e:
         st.error(f"Erro ao salvar usuário: {e}")
 
-def salvar_vinculacoes(cpf, nome_usuario, setor_escolhido, instrumentos_por_unidade, 
-                         objetivos_por_instrumento, eixos_por_objetivo, acoes_por_eixo):
+def salvar_vinculacoes(
+    cpf, nome_usuario, setor_escolhido, instrumentos_por_unidade, 
+    objetivos_por_instrumento, eixos_por_objetivo, acoes_por_eixo
+):
     """
     Insere novos registros de vinculações no banco, garantindo que o usuário esteja cadastrado.
     Utiliza a tabela 'relacionamentos_coleta' para armazenar os dados com os relacionamentos corretos.
@@ -55,23 +60,28 @@ def salvar_vinculacoes(cpf, nome_usuario, setor_escolhido, instrumentos_por_unid
         conn = conectar_banco()
         cur = conn.cursor()
 
-        # Garantir que o usuário está cadastrado
+        # 1) Garantir que o usuário está cadastrado
         salvar_usuario(cpf, nome_usuario, setor_escolhido)
 
-        # Obter usuário_id
+        # 2) Obter usuario_id
         cur.execute("SELECT id FROM usuarios WHERE cpf = %s", (cpf,))
         usuario_rec = cur.fetchone()
         if not usuario_rec:
             st.error("Usuário não encontrado após cadastro.")
+            cur.close()
+            conn.close()
             return
         usuario_id = usuario_rec[0]
 
-        # Obter setor_id
+        # 3) Obter setor_id
         setor_id = get_id(cur, 'setor', 'nome', setor_escolhido)
         if not setor_id:
             st.error("Setor não encontrado no banco de dados.")
+            cur.close()
+            conn.close()
             return
 
+        # 4) Percorrer cada Unidade e Instrumento selecionados
         for unidade, instrumentos in instrumentos_por_unidade.items():
             # Obter unidade_id
             unidade_id = get_id(cur, 'unidade_conservacao', 'nome', unidade)
@@ -85,10 +95,10 @@ def salvar_vinculacoes(cpf, nome_usuario, setor_escolhido, instrumentos_por_unid
                     st.error(f"Instrumento '{instrumento}' não encontrado.")
                     continue
 
+                # 5) Para cada Objetivo daquela (unidade, instrumento)
                 objetivos = objetivos_por_instrumento.get((unidade, instrumento), [])
                 for objetivo in objetivos:
-                    # Para objetivo, a coluna é 'descricao'.
-                    # Se não existir, insere o objetivo e obtém o id.
+                    # Se não existir objetivo na tabela, insere e pega o ID
                     objetivo_id = get_id(cur, 'objetivo_especifico', 'descricao', objetivo)
                     if not objetivo_id:
                         cur.execute(
@@ -98,19 +108,23 @@ def salvar_vinculacoes(cpf, nome_usuario, setor_escolhido, instrumentos_por_unid
                         objetivo_id = cur.fetchone()[0]
                         conn.commit()
 
+                    # 6) Para cada Eixo temático do (unidade, instrumento, objetivo)
                     eixos = eixos_por_objetivo.get((unidade, instrumento, objetivo), [])
                     for eixo in eixos:
-                        # eixo é opcional; caso seja 'Nenhuma' ou vazio, será considerado como None
+                        # Se for 'Nenhuma' ou vazio, seta None
                         eixo_id = get_id(cur, 'eixo_tematico', 'nome', eixo) if eixo and eixo != 'Nenhuma' else None
 
+                        # 7) Para cada Ação naquele (unidade, instrumento, objetivo, eixo)
                         acoes = acoes_por_eixo.get((unidade, instrumento, objetivo, eixo), [])
                         if acoes:
                             for acao in acoes:
-                                acao_id = get_id(cur, 'acao_manejo', 'nome', acao) if acao and acao != 'Nenhuma' else None
+                                # AGORA acao É ID, então não chamamos get_id com 'nome' = acao.
+                                acao_id = acao  # pois acao já é um inteiro ID
                                 cur.execute(
                                     """
-                                    INSERT INTO relacionamentos_coleta 
-                                    (usuario_id, setor_id, unidade_id, instrumento_id, objetivo_id, eixo_tematico_id, acao_manejo_id, preenchido_em)
+                                    INSERT INTO relacionamentos_coleta
+                                    (usuario_id, setor_id, unidade_id, instrumento_id, 
+                                     objetivo_id, eixo_tematico_id, acao_manejo_id, preenchido_em)
                                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                                     """,
                                     (
@@ -128,8 +142,9 @@ def salvar_vinculacoes(cpf, nome_usuario, setor_escolhido, instrumentos_por_unid
                             # Inserir sem ação de manejo
                             cur.execute(
                                 """
-                                INSERT INTO relacionamentos_coleta 
-                                (usuario_id, setor_id, unidade_id, instrumento_id, objetivo_id, eixo_tematico_id, acao_manejo_id, preenchido_em)
+                                INSERT INTO relacionamentos_coleta
+                                (usuario_id, setor_id, unidade_id, instrumento_id, 
+                                 objetivo_id, eixo_tematico_id, acao_manejo_id, preenchido_em)
                                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                                 """,
                                 (
@@ -152,8 +167,10 @@ def salvar_vinculacoes(cpf, nome_usuario, setor_escolhido, instrumentos_por_unid
     except Exception as e:
         st.error(f"Erro ao salvar os dados: {e}")
 
-def coletar_dados_para_exportar(usuario, setor_escolhido, instrumentos_por_unidade, 
-                                objetivos_por_instrumento, eixos_por_objetivo, acoes_por_eixo):
+def coletar_dados_para_exportar(
+    usuario, setor_escolhido, instrumentos_por_unidade, 
+    objetivos_por_instrumento, eixos_por_objetivo, acoes_por_eixo
+):
     dados = []
     for unidade, instrumentos in instrumentos_por_unidade.items():
         for instrumento in instrumentos:
@@ -164,13 +181,14 @@ def coletar_dados_para_exportar(usuario, setor_escolhido, instrumentos_por_unida
                     acoes = acoes_por_eixo.get((unidade, instrumento, objetivo, eixo), [])
                     if acoes:
                         for acao in acoes:
+                            # Aqui 'acao' é o ID da ação, se quiser exibir o ID:
                             dados.append([
                                 setor_escolhido,
                                 unidade,
                                 instrumento,
                                 objetivo,
                                 eixo,
-                                acao,
+                                acao,  # ID ou poderia buscar nome novamente, se quisesse
                                 usuario,
                                 datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                             ])
@@ -207,6 +225,8 @@ def listar_vinculacoes(cpf=None):
 
         if not setor_usuario:
             st.warning("Usuário não encontrado ou não associado a um setor.")
+            cur.close()
+            conn.close()
             return []
 
         setor_usuario = setor_usuario[0]
@@ -291,12 +311,15 @@ def editar_vinculacao(vinc_id, setor, unidade, instrumento, objetivo, eixo_temat
         eixo_id = get_id(cur, 'eixo_tematico', 'nome', eixo_tematico) if eixo_tematico and eixo_tematico != 'Nenhuma' else None
         acao_id = get_id(cur, 'acao_manejo', 'nome', acao_manejo) if acao_manejo and acao_manejo != 'Nenhuma' else None
 
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE relacionamentos_coleta
-            SET setor_id = %s, unidade_id = %s, instrumento_id = %s, objetivo_id = %s, 
+            SET setor_id = %s, unidade_id = %s, instrumento_id = %s, objetivo_id = %s,
                 eixo_tematico_id = %s, acao_manejo_id = %s, preenchido_em = %s
             WHERE id = %s
-        """, (setor_id, unidade_id, instrumento_id, objetivo_id, eixo_id, acao_id, datetime.now(), vinc_id))
+            """,
+            (setor_id, unidade_id, instrumento_id, objetivo_id, eixo_id, acao_id, datetime.now(), vinc_id)
+        )
         conn.commit()
         cur.close()
         conn.close()

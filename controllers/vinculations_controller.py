@@ -154,10 +154,6 @@ def salvar_vinculacoes(cpf, nome_usuario, setor_escolhido, instrumentos_por_unid
 
 def coletar_dados_para_exportar(usuario, setor_escolhido, instrumentos_por_unidade, 
                                 objetivos_por_instrumento, eixos_por_objetivo, acoes_por_eixo):
-    """
-    Coleta os dados que serão exportados para Excel.
-    Retorna uma lista de registros com os campos necessários.
-    """
     dados = []
     for unidade, instrumentos in instrumentos_por_unidade.items():
         for instrumento in instrumentos:

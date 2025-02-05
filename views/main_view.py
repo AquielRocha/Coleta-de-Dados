@@ -5,6 +5,25 @@ from controllers.vinculations_controller import salvar_vinculacoes, coletar_dado
 from utils.export_utils import exportar_para_excel
 from utils.validation import validar_campos
 
+def update_usuario_setor(cpf, novo_setor):
+    """
+    Atualiza o setor do usuário no banco de dados.
+    """
+    try:
+        conn = conectar_banco()
+        cur = conn.cursor()
+        # Obtém o ID do setor selecionado
+        cur.execute("SELECT id FROM setor WHERE nome = %s", (novo_setor,))
+        setor_row = cur.fetchone()
+        if setor_row:
+            novo_setor_id = setor_row[0]
+            cur.execute("UPDATE usuarios SET setor_id = %s WHERE cpf = %s", (novo_setor_id, cpf))
+            conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        st.error(f"Erro ao atualizar setor do usuário: {e}")
+
 def render_identificacao():
     cpf = st.text_input(
         "Digite seu CPF:", 
@@ -17,7 +36,6 @@ def render_identificacao():
         st.warning("Por favor, insira seu CPF para prosseguir.")
         st.stop()
 
-    # Tenta buscar o usuário no banco pelo CPF
     try:
         conn = conectar_banco()
         cur = conn.cursor()
@@ -33,19 +51,21 @@ def render_identificacao():
         st.stop()
 
     if usuario:
-        # Usuário já cadastrado: nome e setor são automaticamente preenchidos
+        # Usuário já cadastrado: os dados serão exibidos em modo somente leitura.
         nome_usuario, setor = usuario
-        st.info(f"Bem-vindo de volta, {nome_usuario}! ")
+        st.session_state["user_registrado"] = True
+        st.session_state["setor_registrado"] = setor
+        st.session_state["cpf"] = cpf
+        st.info(f"Bem-vindo de volta, {nome_usuario}!")
         st.text_input("Nome", value=nome_usuario, disabled=True, key="nome_usuario_input")
         st.text_input("Setor", value=setor, disabled=True, key="setor_usuario_input")
     else:
-        # Usuário não cadastrado: solicitar os dados
+        st.session_state["user_registrado"] = False
         nome_usuario = st.text_input(
             "Digite seu Nome Completo:",
             help="Informe seu nome completo para o cadastro.",
             key="nome_usuario"
         ).strip()
-        # Recupera as opções de setor para cadastro
         setores = obter_dados("SELECT DISTINCT nome FROM setor")
         setor = st.selectbox(
             "Selecione o Setor", 
@@ -53,18 +73,36 @@ def render_identificacao():
             help="Escolha o setor onde a atividade ocorrerá.",
             key="setor_selectbox"
         )
+        # Armazena o setor escolhido para novos usuários
+        st.session_state["setor_registrado"] = setor
 
-    return cpf, nome_usuario, setor
+    return cpf, nome_usuario, st.session_state["setor_registrado"]
 
 def render_setor_unidade():
     setores = obter_dados("SELECT DISTINCT nome FROM setor")
-    setor_escolhido = st.selectbox(
-        "Selecione o Setor",
-        setores,
-        help="Escolha o setor onde a atividade ocorrerá.",
-        key="setor_unidade_selectbox"
-    )
-
+    # Para usuários cadastrados, oferecemos a opção de mudar de setor.
+    if st.session_state.get("user_registrado"):
+        atual = st.session_state["setor_registrado"]
+        st.info(f"Setor atual: {atual}.")
+        deseja_mudar = st.checkbox("Desejo mudar de setor", key="mudar_setor")
+        if deseja_mudar:
+            setor_escolhido = st.selectbox(
+                "Selecione o Novo Setor",
+                setores,
+                help="Escolha o novo setor. ATENÇÃO: Ao mudar de setor, você não poderá visualizar os dados do setor anterior.",
+                key="setor_unidade_selectbox"
+            )
+            if setor_escolhido != atual:
+                st.warning(f"Ao mudar de setor, você não poderá visualizar os dados do setor {atual}. Atualizando seu setor...")
+                cpf = st.session_state.get("cpf")
+                update_usuario_setor(cpf, setor_escolhido)
+                st.session_state["setor_registrado"] = setor_escolhido
+        else:
+            setor_escolhido = atual
+    else:
+        # Para usuários não cadastrados, usa o setor já selecionado na identificação.
+        setor_escolhido = st.session_state.get("setor_registrado")
+    
     unidades = obter_dados("SELECT DISTINCT nome FROM unidade_conservacao")
     unidade_selecionada = st.selectbox(
         "Selecione a Unidade de Conservação",
@@ -88,7 +126,6 @@ def render_instrumentos(unidade_selecionada):
     return instrumentos_por_unidade
 
 def render_objetivos(instrumentos_por_unidade):
-    # Inicializa as variáveis de sessão, se necessário
     if "objetivos_por_instrumento" not in st.session_state:
         st.session_state["objetivos_por_instrumento"] = {}
     if "objetivos_inputs" not in st.session_state:
@@ -134,8 +171,6 @@ def render_objetivos(instrumentos_por_unidade):
                     with col4:
                         if st.button("Remover", key=f"remove_obj_{unidade}_{instrumento}_{idx}_button"):
                             st.session_state["objetivos_por_instrumento"][chave].pop(idx - 1)
-                            st.experimental_rerun()
-
     return st.session_state["objetivos_por_instrumento"]
 
 def render_eixos(objetivos_por_instrumento):
@@ -199,10 +234,10 @@ def render():
     st.markdown("<h1 style='color:#E5EFE3;'>Gestão de Manejo - ICMBio</h1>", unsafe_allow_html=True)
     st.info("Preencha as informações abaixo para registrar as vinculações de manejo. Por favor, siga as instruções cuidadosamente.")
 
-    # Identificação do usuário
+    # Identificação do usuário (se já cadastrado, os dados são carregados automaticamente)
     cpf, nome_usuario, setor = render_identificacao()
 
-    # Seleção de Setor e Unidade de Conservação
+    # Seleção de Setor e Unidade de Conservação (para usuários cadastrados, a opção de mudar setor é opcional)
     setor_escolhido, unidade_selecionada = render_setor_unidade()
 
     # Seleção de Instrumentos
@@ -256,7 +291,8 @@ def render():
                 setor_escolhido,
                 instrumentos_por_unidade,
                 objetivos_por_instrumento,
-                eixos_por_eixo
+                eixos_por_objetivo,
+                acoes_por_eixo
             )
         else:
             st.warning("Por favor, preencha todos os campos obrigatórios antes de salvar.")

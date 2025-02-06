@@ -49,12 +49,13 @@ def salvar_usuario(cpf, nome, setor):
         st.error(f"Erro ao salvar usuário: {e}")
 
 def salvar_vinculacoes(
-    cpf, nome_usuario, setor_escolhido, instrumentos_por_unidade, 
+    cpf, nome_usuario, setor_escolhido, instrumentos_unidades, 
     objetivos_por_instrumento, eixos_por_objetivo, acoes_por_eixo
 ):
     """
     Insere novos registros de vinculações no banco, garantindo que o usuário esteja cadastrado.
     Utiliza a tabela 'relacionamentos_coleta' para armazenar os dados com os relacionamentos corretos.
+    Agora, a estrutura é baseada em cada instrumento e sua(s) UC(s) selecionada(s) (única ou múltipla).
     """
     try:
         conn = conectar_banco()
@@ -81,24 +82,31 @@ def salvar_vinculacoes(
             conn.close()
             return
 
-        # 4) Percorrer cada Unidade e Instrumento selecionados
-        for unidade, instrumentos in instrumentos_por_unidade.items():
-            # Obter unidade_id
-            unidade_id = get_id(cur, 'unidade_conservacao', 'nome', unidade)
-            if not unidade_id:
-                st.error(f"Unidade '{unidade}' não encontrada.")
+        # 4) Para cada instrumento selecionado, iterar sobre as UC(s) definidas
+        for instrumento, ucs in instrumentos_unidades.items():
+            # instrumento é uma tupla (id, nome)
+            instrumento_id = get_id(cur, 'instrumento', 'nome', instrumento[1])
+            if not instrumento_id:
+                st.error(f"Instrumento '{instrumento[1]}' não encontrado.")
                 continue
 
-            for instrumento in instrumentos:
-                instrumento_id = get_id(cur, 'instrumento', 'nome', instrumento)
-                if not instrumento_id:
-                    st.error(f"Instrumento '{instrumento}' não encontrado.")
+            # Obter os objetivos para este instrumento – chave: (instrumento_id, instrumento_nome)
+            chave_inst = (instrumento[0], instrumento[1])
+            objetivos = objetivos_por_instrumento.get(chave_inst, [])
+            if not objetivos:
+                st.warning(f"Sem objetivos cadastrados para o instrumento '{instrumento[1]}'.")
+                continue
+
+            # Para cada UC selecionada para este instrumento
+            for uc in ucs:
+                unidade_id = get_id(cur, 'unidade_conservacao', 'nome', uc)
+                if not unidade_id:
+                    st.error(f"Unidade de Conservação '{uc}' não encontrada.")
                     continue
 
-                # 5) Para cada Objetivo daquela (unidade, instrumento)
-                objetivos = objetivos_por_instrumento.get((unidade, instrumento), [])
+                # Para cada objetivo daquele instrumento
                 for objetivo in objetivos:
-                    # Se não existir objetivo na tabela, insere e pega o ID
+                    # Verificar se o objetivo já existe na tabela; se não, insere e pega o ID
                     objetivo_id = get_id(cur, 'objetivo_especifico', 'descricao', objetivo)
                     if not objetivo_id:
                         cur.execute(
@@ -108,18 +116,24 @@ def salvar_vinculacoes(
                         objetivo_id = cur.fetchone()[0]
                         conn.commit()
 
-                    # 6) Para cada Eixo temático do (unidade, instrumento, objetivo)
-                    eixos = eixos_por_objetivo.get((unidade, instrumento, objetivo), [])
+                    # 5) Para cada Eixo temático associado ao (instrumento, objetivo)
+                    chave_obj = (instrumento[0], instrumento[1], objetivo)
+                    eixos = eixos_por_objetivo.get(chave_obj, [])
+                    if not eixos:
+                        st.warning(f"Sem eixos temáticos para o objetivo '{objetivo}' no instrumento '{instrumento[1]}'.")
+                        continue
+
                     for eixo in eixos:
                         # Se for 'Nenhuma' ou vazio, seta None
                         eixo_id = get_id(cur, 'eixo_tematico', 'nome', eixo) if eixo and eixo != 'Nenhuma' else None
 
-                        # 7) Para cada Ação naquele (unidade, instrumento, objetivo, eixo)
-                        acoes = acoes_por_eixo.get((unidade, instrumento, objetivo, eixo), [])
+                        # 6) Para cada Ação associada ao (instrumento, objetivo, eixo)
+                        chave_acao = (instrumento[0], instrumento[1], objetivo, eixo)
+                        acoes = acoes_por_eixo.get(chave_acao, [])
                         if acoes:
                             for acao in acoes:
-                                # AGORA acao É ID, então não chamamos get_id com 'nome' = acao.
-                                acao_id = acao  # pois acao já é um inteiro ID
+                                # Neste caso, 'acao' já é o ID
+                                acao_id = acao
                                 cur.execute(
                                     """
                                     INSERT INTO relacionamentos_coleta
@@ -139,7 +153,7 @@ def salvar_vinculacoes(
                                     ),
                                 )
                         else:
-                            # Inserir sem ação de manejo
+                            # Inserir registro mesmo sem ação de manejo
                             cur.execute(
                                 """
                                 INSERT INTO relacionamentos_coleta
@@ -158,7 +172,6 @@ def salvar_vinculacoes(
                                     datetime.now(),
                                 ),
                             )
-
         conn.commit()
         cur.close()
         conn.close()
@@ -168,35 +181,47 @@ def salvar_vinculacoes(
         st.error(f"Erro ao salvar os dados: {e}")
 
 def coletar_dados_para_exportar(
-    usuario, setor_escolhido, instrumentos_por_unidade, 
+    usuario, setor_escolhido, instrumentos_unidades, 
     objetivos_por_instrumento, eixos_por_objetivo, acoes_por_eixo
 ):
+    """
+    Prepara os dados para exportação para Excel.
+    A iteração considera a estrutura:
+      - Para cada instrumento e sua(s) UC(s)
+      - Para cada objetivo do instrumento
+      - Para cada eixo associado ao objetivo
+      - Para cada ação associada (se houver)
+    """
     dados = []
-    for unidade, instrumentos in instrumentos_por_unidade.items():
-        for instrumento in instrumentos:
-            objetivos = objetivos_por_instrumento.get((unidade, instrumento), [])
+    for instrumento, ucs in instrumentos_unidades.items():
+        inst_id, inst_nome = instrumento
+        # Obter os objetivos para este instrumento
+        chave_inst = (inst_id, inst_nome)
+        objetivos = objetivos_por_instrumento.get(chave_inst, [])
+        for uc in ucs:
             for objetivo in objetivos:
-                eixos = eixos_por_objetivo.get((unidade, instrumento, objetivo), [])
+                chave_obj = (inst_id, inst_nome, objetivo)
+                eixos = eixos_por_objetivo.get(chave_obj, [])
                 for eixo in eixos:
-                    acoes = acoes_por_eixo.get((unidade, instrumento, objetivo, eixo), [])
+                    chave_acao = (inst_id, inst_nome, objetivo, eixo)
+                    acoes = acoes_por_eixo.get(chave_acao, [])
                     if acoes:
                         for acao in acoes:
-                            # Aqui 'acao' é o ID da ação, se quiser exibir o ID:
                             dados.append([
                                 setor_escolhido,
-                                unidade,
-                                instrumento,
+                                uc,
+                                inst_nome,
                                 objetivo,
                                 eixo,
-                                acao,  # ID ou poderia buscar nome novamente, se quisesse
+                                acao,  # ID da ação
                                 usuario,
                                 datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                             ])
                     else:
                         dados.append([
                             setor_escolhido,
-                            unidade,
-                            instrumento,
+                            uc,
+                            inst_nome,
                             objetivo,
                             eixo,
                             'Nenhuma',
@@ -209,7 +234,6 @@ def listar_vinculacoes(cpf=None):
     """
     Retorna todas as vinculações cadastradas para um usuário filtrando pelo setor ao qual ele pertence.
     Se o parâmetro cpf for informado, retorna somente os registros relacionados ao setor do usuário.
-    Utiliza a tabela 'relacionamentos_coleta' e realiza joins para obter os nomes.
     """
     try:
         conn = conectar_banco()
@@ -258,7 +282,6 @@ def listar_vinculacoes(cpf=None):
 def obter_vinculacao_por_id(vinc_id):
     """
     Retorna os dados completos de uma vinculação específica, dado o ID.
-    Esses dados serão utilizados para pré-preencher o formulário de edição.
     """
     try:
         conn = conectar_banco()
@@ -287,8 +310,6 @@ def obter_vinculacao_por_id(vinc_id):
 def editar_vinculacao(vinc_id, setor, unidade, instrumento, objetivo, eixo_tematico, acao_manejo):
     """
     Atualiza a vinculação com o ID especificado.
-    O CPF (armazenado na tabela de usuários) não é alterado.
-    Todos os demais campos são atualizados e a data de atualização é gravada.
     """
     try:
         conn = conectar_banco()

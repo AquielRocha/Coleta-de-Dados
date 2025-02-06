@@ -1,7 +1,5 @@
-# utils/export_utils.py
 import pandas as pd
 from io import BytesIO
-from datetime import datetime
 
 def exportar_para_excel(dados):
     """Exporta os dados para um arquivo Excel."""

@@ -193,14 +193,21 @@ def render_objetivos(instrumentos_unidades):
                 else:
                     st.warning("Este objetivo já foi adicionado.")
             else:
-                st.warning("Por favor, insira um objetivo válido.")
+                st.warning("Por favor, insira um objetivo válido antes de adicionar.")
 
         if st.session_state["objetivos_por_instrumento"][chave_inst]:
-            st.markdown("**Objetivos Adicionados:**")
+            st.markdown("**Objetivos Adicionados:**", unsafe_allow_html=True)
             for idx, obj in enumerate(st.session_state["objetivos_por_instrumento"][chave_inst], 1):
-                st.write(f"{idx}. {obj}")
-
+                col1, col2 = st.columns([10, 1])
+                with col1:
+                    st.write(f"{idx}. {obj}")
+                with col2:
+                    if st.button("Remover", key=f"remove_obj_{instrumento[0]}_{idx}_button"):
+                        st.session_state["objetivos_por_instrumento"][chave_inst].pop(idx - 1)
+                        # Atualiza a interface após a remoção (se necessário)
     return st.session_state["objetivos_por_instrumento"]
+
+
 
 def render_eixos(objetivos_por_instrumento):
     """
@@ -306,14 +313,20 @@ def render_resumo(setor_escolhido, instrumentos_unidades, objetivos_por_instrume
                         resumo_md += f"  - **Eixo Temático**: {eixo}\n"
                         acoes = acoes_por_eixo.get((inst_id, inst_nome, obj, eixo), [])
                         if acoes:
-                            resumo_md += f"      - **Ações de Manejo**: {', '.join(map(str, acoes))}\n"
+                            # Realiza um join utilizando o nome da ação, se disponível
+                            acoes_nomes = ", ".join(
+                                [acao['nome'] if isinstance(acao, dict) and 'nome' in acao else str(acao)
+                                 for acao in acoes]
+                            )
+                            resumo_md += f"      - **Ações de Manejo**: {acoes_nomes}\n"
                         else:
                             resumo_md += "      - **Ações de Manejo**: Nenhuma\n"
                 else:
                     resumo_md += "  - **Eixos Temáticos**: Nenhum\n"
         else:
             resumo_md += "Nenhum objetivo adicionado.\n"
-        resumo_md += "\n"
+        # Separador para visualização mais clara de cada instrumento
+        resumo_md += "\n---\n\n"
 
     st.markdown(resumo_md, unsafe_allow_html=True)
 

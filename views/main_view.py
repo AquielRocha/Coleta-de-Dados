@@ -111,6 +111,11 @@ def render_instrumentos_unidades():
     Permite a seleção de um ou mais instrumentos e, conforme a quantidade selecionada,
     exibe apenas UM campo para a escolha da Unidade de Conservação (UC), que será comum a todos os instrumentos.
     Se apenas um instrumento for selecionado e este for o PANs (ID 8), permite selecionar múltiplas UCs.
+    
+    Além disso, exibe um input para a descrição específica de cada instrumento selecionado.
+    Retorna:
+      - instrumentos_unidades: dicionário onde a chave é o instrumento (tupla: (id, nome)) e o valor é a(s) UC(s) selecionada(s)
+      - descricao_instrumento: dicionário onde a chave é o instrumento e o valor é a descrição informada
     """
     # Consulta a lista de instrumentos (cada registro é uma tupla: (id, nome))
     instrumentos = obter_dados("SELECT id, nome FROM instrumento")
@@ -153,7 +158,7 @@ def render_instrumentos_unidades():
                 ucs = [uc] if uc else []
             instrumentos_unidades[instrumento] = ucs
         elif len(instrumentos_selecionados) > 1:
-            # Se mais de um instrumento for selecionado, exibe apenas um campo para UC
+            # Se mais de um instrumento for selecionado, exibe apenas um campo para UC comum a todos
             uc = st.selectbox(
                 "Selecione a Unidade de Conservação (única para todos os instrumentos)",
                 options=unidades,
@@ -163,7 +168,20 @@ def render_instrumentos_unidades():
             ucs = [uc] if uc else []
             for instrumento in instrumentos_selecionados:
                 instrumentos_unidades[instrumento] = ucs
-    return instrumentos_unidades
+
+    # Agora, adicionar a captura de descrição para cada instrumento selecionado
+    descricao_instrumento = {}
+    if instrumentos_selecionados:
+        st.markdown("### Descrição Específica dos Instrumentos")
+        for instrumento in instrumentos_selecionados:
+            descricao = st.text_input(
+                f"Digite a descrição para o instrumento '{instrumento[1]}'",
+                key=f"desc_instrumento_{instrumento[0]}",
+                help="Informe uma descrição específica para este instrumento."
+            )
+            descricao_instrumento[instrumento] = descricao
+
+    return instrumentos_unidades, descricao_instrumento
 
 def render_objetivos(instrumentos_unidades):
     """
@@ -342,7 +360,7 @@ def render():
     setor_escolhido = render_setor()
 
     # 3) Seleção de Instrumentos e respectiva Unidade de Conservação
-    instrumentos_unidades = render_instrumentos_unidades()
+    instrumentos_unidades, descricao_instrumento = render_instrumentos_unidades()
 
     # 4) Objetivos específicos para cada instrumento
     objetivos_por_instrumento = render_objetivos(instrumentos_unidades)
@@ -369,8 +387,10 @@ def render():
         instrumentos_unidades,
         objetivos_por_instrumento,
         eixos_por_objetivo,
-        acoes_por_eixo
+        acoes_por_eixo,
+        descricao_instrumento  # Agora, a função aceita esse parâmetro
     )
+
     if dados_para_exportar:
         excel_buffer = exportar_para_excel(dados_para_exportar)
         st.download_button(
@@ -397,7 +417,8 @@ def render():
                 instrumentos_unidades,
                 objetivos_por_instrumento,
                 eixos_por_objetivo,
-                acoes_por_eixo
+                acoes_por_eixo,
+                descricao_instrumento  # Passando as descrições para o controller, se necessário.
             )
         else:
             st.warning("Por favor, preencha todos os campos obrigatórios antes de salvar.")

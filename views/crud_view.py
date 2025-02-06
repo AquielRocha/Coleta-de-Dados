@@ -25,27 +25,44 @@ def carregar_registros(cpf_input):
 def exibir_registros(records):
     """
     Exibe os registros em formato de tabela, ocultando o ID para visualização.
-    Cada 'record' é uma tupla com 9 colunas:
-    [0]=ID, [1]=CPF, [2]=Setor, [3]=Unidade, [4]=Instrumento,
-    [5]=Objetivo, [6]=Eixo, [7]=Ação, [8]=Preenchido em.
+    Cada 'record' é uma tupla com 10 colunas:
+      [0]=ID, [1]=Nome, [2]=Setor, [3]=Unidade, [4]=Instrumento, 
+      [5]=Objetivo, [6]=Eixo Temático, [7]=Ação de Manejo, [8]=Preenchido em,
+      [9]=Descrição do Instrumento.
     """
+    # Cria o DataFrame com a ordem desejada.
+    # Aqui vamos reordenar os campos para que apareçam da forma que você deseja:
+    # Por exemplo: Setor, Unidade, Descrição do Instrumento, Instrumento, Objetivo, Eixo Temático, Ação de Manejo, Nome, Preenchido em
     df = pd.DataFrame(
         records,
         columns=[
-            "ID",
-            "CPF",
-            "Setor",
-            "Unidade",
-            "Instrumento",
-            "Objetivo",
-            "Eixo Temático",
-            "Ação de Manejo",
-            "Preenchido em",
-        ],
+            "ID",                    # [0]
+            "Nome",                  # [1] - nome do usuário
+            "Setor",                 # [2]
+            "Unidade",               # [3]
+            "Instrumento",           # [4]
+            "Objetivo",              # [5]
+            "Eixo Temático",         # [6]
+            "Ação de Manejo",        # [7]
+            "Preenchido em",         # [8]
+            "Descrição do Instrumento"  # [9]
+        ]
     )
-    # Cria uma cópia sem a coluna "ID" para exibição
-    df_exibicao = df.drop(columns=["ID"])
-    
+    # Reorganiza as colunas para a visualização (ocultando o ID e invertendo a ordem, se necessário).
+    # Por exemplo, podemos reordenar para:
+    ordem_exibicao = [
+        "Setor",
+        "Unidade",
+        "Descrição do Instrumento",
+        "Instrumento",
+        "Objetivo",
+        "Eixo Temático",
+        "Ação de Manejo",
+        "Nome",
+        "Preenchido em"
+    ]
+    df_exibicao = df[ordem_exibicao]
+
     st.subheader("Registros de Manejo do seu setor")
     st.dataframe(df_exibicao, use_container_width=True)
 
@@ -88,10 +105,9 @@ def render_edit_delete_form(records):
     """
     Renderiza o formulário para edição e deleção dos registros.
     Cada registro em 'records' deve ter a estrutura:
-      (id, cpf, setor, unidade, instrumento, objetivo, eixo, acao, preenchido_em)
+      (id, nome, setor, unidade, instrumento, objetivo, eixo temático, ação de manejo, preenchido_em, descricao_instrumento)
     """
     # Cria um dicionário de opções para seleção do registro
-    # Ex.: "Unidade: Parque X | Instrumento: Plano de Manejo | Objetivo: Preservar..." -> tupla dos dados
     options = {
         f"Unidade: {r[3]} | Instrumento: {r[4]} | Objetivo: {r[5]}": r
         for r in records
@@ -105,11 +121,11 @@ def render_edit_delete_form(records):
     selected_record = options[selected_label]
 
     st.markdown("### Dados Selecionados para Edição")
-    st.write("Confira os dados abaixo. O campo **CPF** é somente leitura. Você pode alterar os demais campos, se necessário.")
+    st.write("Confira os dados abaixo. O campo **CPF/Nome** é somente leitura. Você pode alterar os demais campos, se necessário.")
     
-    # Exibe o CPF em modo somente leitura
+    # Exibe o Nome em modo somente leitura (índice [1])
     st.text_input(
-        "CPF (somente leitura)",
+        "Nome (somente leitura)",
         value=selected_record[1],
         disabled=True
     )
@@ -123,7 +139,7 @@ def render_edit_delete_form(records):
         acoes_options,
     ) = obter_opcoes_cadastro()
 
-    # selected_record[2] = setor atual
+    # Setor
     try:
         setor = st.selectbox(
             "Selecione o Setor",
@@ -135,7 +151,7 @@ def render_edit_delete_form(records):
         st.error(f"Erro ao carregar o setor: {e}")
         setor = selected_record[2]  # fallback
 
-    # selected_record[3] = unidade atual
+    # Unidade
     try:
         unidade = st.selectbox(
             "Selecione a Unidade de Conservação",
@@ -147,7 +163,7 @@ def render_edit_delete_form(records):
         st.error(f"Erro ao carregar a unidade: {e}")
         unidade = selected_record[3]  # fallback
 
-    # selected_record[4] = instrumento atual
+    # Instrumento
     try:
         instrumento = st.selectbox(
             "Selecione o Instrumento",
@@ -159,14 +175,14 @@ def render_edit_delete_form(records):
         st.error(f"Erro ao carregar o instrumento: {e}")
         instrumento = selected_record[4]  # fallback
 
-    # selected_record[5] = objetivo atual (texto livre)
+    # Objetivo
     objetivo = st.text_input(
         "Digite o Objetivo",
         value=selected_record[5],
         help="Edite o objetivo conforme necessário. Este campo permite entrada livre de texto."
     )
 
-    # selected_record[6] = eixo temático atual
+    # Eixo Temático
     try:
         eixo_tematico = st.selectbox(
             "Selecione o Eixo Temático",
@@ -178,7 +194,7 @@ def render_edit_delete_form(records):
         st.error(f"Erro ao carregar o eixo temático: {e}")
         eixo_tematico = selected_record[6]  # fallback
 
-    # selected_record[7] = ação de manejo atual
+    # Ação de Manejo
     try:
         acao_manejo = st.selectbox(
             "Selecione a Ação de Manejo",
@@ -189,6 +205,13 @@ def render_edit_delete_form(records):
     except Exception as e:
         st.error(f"Erro ao carregar a ação de manejo: {e}")
         acao_manejo = selected_record[7]  # fallback
+
+    # Adicione o input para a Descrição do Instrumento (índice [9])
+    descricao_instrumento = st.text_input(
+        "Digite a Descrição do Instrumento",
+        value=selected_record[9] if len(selected_record) > 9 else "",
+        help="Edite a descrição do instrumento, se necessário."
+    )
 
     st.markdown("### Confirmação")
     st.info("Revise os dados alterados abaixo.")
@@ -203,13 +226,14 @@ def render_edit_delete_form(records):
                 instrumento=instrumento,
                 objetivo=objetivo,
                 eixo_tematico=eixo_tematico,
-                acao_manejo=acao_manejo
+                acao_manejo=acao_manejo,
+                descricao_instrumento=descricao_instrumento
             )
             st.success("Alterações salvas com sucesso!")
             # Limpa os registros em cache para forçar recarregar da base
             if "records" in st.session_state:
                 del st.session_state["records"]
-    
+
     with col2:
         if st.button("Deletar Registro"):
             if st.checkbox(

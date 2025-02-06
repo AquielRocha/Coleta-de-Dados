@@ -50,21 +50,16 @@ def salvar_usuario(cpf, nome, setor):
 
 def salvar_vinculacoes(
     cpf, nome_usuario, setor_escolhido, instrumentos_unidades, 
-    objetivos_por_instrumento, eixos_por_objetivo, acoes_por_eixo
+    objetivos_por_instrumento, eixos_por_objetivo, acoes_por_eixo, descricao_instrumento
 ):
-    """
-    Insere novos registros de vinculações no banco, garantindo que o usuário esteja cadastrado.
-    Utiliza a tabela 'relacionamentos_coleta' para armazenar os dados com os relacionamentos corretos.
-    Agora, a estrutura é baseada em cada instrumento e sua(s) UC(s) selecionada(s) (única ou múltipla).
-    """
     try:
         conn = conectar_banco()
         cur = conn.cursor()
 
-        # 1) Garantir que o usuário está cadastrado
+        # Garantir que o usuário esteja cadastrado
         salvar_usuario(cpf, nome_usuario, setor_escolhido)
 
-        # 2) Obter usuario_id
+        # Obter usuário e setor
         cur.execute("SELECT id FROM usuarios WHERE cpf = %s", (cpf,))
         usuario_rec = cur.fetchone()
         if not usuario_rec:
@@ -73,8 +68,7 @@ def salvar_vinculacoes(
             conn.close()
             return
         usuario_id = usuario_rec[0]
-
-        # 3) Obter setor_id
+        
         setor_id = get_id(cur, 'setor', 'nome', setor_escolhido)
         if not setor_id:
             st.error("Setor não encontrado no banco de dados.")
@@ -82,31 +76,29 @@ def salvar_vinculacoes(
             conn.close()
             return
 
-        # 4) Para cada instrumento selecionado, iterar sobre as UC(s) definidas
+        # Iterar sobre cada instrumento e suas UC(s)
         for instrumento, ucs in instrumentos_unidades.items():
-            # instrumento é uma tupla (id, nome)
             instrumento_id = get_id(cur, 'instrumento', 'nome', instrumento[1])
             if not instrumento_id:
                 st.error(f"Instrumento '{instrumento[1]}' não encontrado.")
                 continue
 
-            # Obter os objetivos para este instrumento – chave: (instrumento_id, instrumento_nome)
+            # Recupera a descrição específica para esse instrumento
+            descricao = descricao_instrumento.get(instrumento, None)
+
             chave_inst = (instrumento[0], instrumento[1])
             objetivos = objetivos_por_instrumento.get(chave_inst, [])
             if not objetivos:
                 st.warning(f"Sem objetivos cadastrados para o instrumento '{instrumento[1]}'.")
                 continue
 
-            # Para cada UC selecionada para este instrumento
             for uc in ucs:
                 unidade_id = get_id(cur, 'unidade_conservacao', 'nome', uc)
                 if not unidade_id:
                     st.error(f"Unidade de Conservação '{uc}' não encontrada.")
                     continue
 
-                # Para cada objetivo daquele instrumento
                 for objetivo in objetivos:
-                    # Verificar se o objetivo já existe na tabela; se não, insere e pega o ID
                     objetivo_id = get_id(cur, 'objetivo_especifico', 'descricao', objetivo)
                     if not objetivo_id:
                         cur.execute(
@@ -116,7 +108,6 @@ def salvar_vinculacoes(
                         objetivo_id = cur.fetchone()[0]
                         conn.commit()
 
-                    # 5) Para cada Eixo temático associado ao (instrumento, objetivo)
                     chave_obj = (instrumento[0], instrumento[1], objetivo)
                     eixos = eixos_por_objetivo.get(chave_obj, [])
                     if not eixos:
@@ -124,28 +115,27 @@ def salvar_vinculacoes(
                         continue
 
                     for eixo in eixos:
-                        # Se for 'Nenhuma' ou vazio, seta None
                         eixo_id = get_id(cur, 'eixo_tematico', 'nome', eixo) if eixo and eixo != 'Nenhuma' else None
 
-                        # 6) Para cada Ação associada ao (instrumento, objetivo, eixo)
                         chave_acao = (instrumento[0], instrumento[1], objetivo, eixo)
                         acoes = acoes_por_eixo.get(chave_acao, [])
                         if acoes:
                             for acao in acoes:
-                                # Neste caso, 'acao' já é o ID
+                                # acao já é o ID
                                 acao_id = acao
                                 cur.execute(
                                     """
                                     INSERT INTO relacionamentos_coleta
-                                    (usuario_id, setor_id, unidade_id, instrumento_id, 
+                                    (usuario_id, setor_id, unidade_id, instrumento_id, descricao_instrumento, 
                                      objetivo_id, eixo_tematico_id, acao_manejo_id, preenchido_em)
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                                     """,
                                     (
                                         usuario_id,
                                         setor_id,
                                         unidade_id,
                                         instrumento_id,
+                                        descricao,  # novo campo com a descrição
                                         objetivo_id,
                                         eixo_id,
                                         acao_id,
@@ -153,19 +143,19 @@ def salvar_vinculacoes(
                                     ),
                                 )
                         else:
-                            # Inserir registro mesmo sem ação de manejo
                             cur.execute(
                                 """
                                 INSERT INTO relacionamentos_coleta
-                                (usuario_id, setor_id, unidade_id, instrumento_id, 
+                                (usuario_id, setor_id, unidade_id, instrumento_id, descricao_instrumento, 
                                  objetivo_id, eixo_tematico_id, acao_manejo_id, preenchido_em)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                                 """,
                                 (
                                     usuario_id,
                                     setor_id,
                                     unidade_id,
                                     instrumento_id,
+                                    descricao,
                                     objetivo_id,
                                     eixo_id,
                                     None,
@@ -180,21 +170,13 @@ def salvar_vinculacoes(
     except Exception as e:
         st.error(f"Erro ao salvar os dados: {e}")
 
-def coletar_dados_para_exportar(
-    usuario, setor_escolhido, instrumentos_unidades, 
-    objetivos_por_instrumento, eixos_por_objetivo, acoes_por_eixo
-):
-    """
-    Prepara os dados para exportação para Excel.
-    A iteração considera a estrutura:
-      - Para cada instrumento e sua(s) UC(s)
-      - Para cada objetivo do instrumento
-      - Para cada eixo associado ao objetivo
-      - Para cada ação associada (se houver)
-    """
+def coletar_dados_para_exportar(usuario, setor_escolhido, instrumentos_unidades, 
+                                objetivos_por_instrumento, eixos_por_objetivo, acoes_por_eixo, descricao_instrumento):
     dados = []
     for instrumento, ucs in instrumentos_unidades.items():
         inst_id, inst_nome = instrumento
+        # Obter a descrição específica para este instrumento
+        desc = descricao_instrumento.get(instrumento, "")
         # Obter os objetivos para este instrumento
         chave_inst = (inst_id, inst_nome)
         objetivos = objetivos_por_instrumento.get(chave_inst, [])
@@ -210,10 +192,11 @@ def coletar_dados_para_exportar(
                             dados.append([
                                 setor_escolhido,
                                 uc,
+                                desc,         # Adiciona a descrição do instrumento
                                 inst_nome,
                                 objetivo,
                                 eixo,
-                                acao,  # ID da ação
+                                acao,         # Ação de Manejo
                                 usuario,
                                 datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                             ])
@@ -221,6 +204,7 @@ def coletar_dados_para_exportar(
                         dados.append([
                             setor_escolhido,
                             uc,
+                            desc,         # Adiciona a descrição do instrumento
                             inst_nome,
                             objetivo,
                             eixo,
@@ -255,9 +239,11 @@ def listar_vinculacoes(cpf=None):
 
         setor_usuario = setor_usuario[0]
 
+        # Note que aqui, em vez de u.cpf, usamos u.nome para exibir o nome do usuário.
         cur.execute("""
-            SELECT rc.id, u.cpf, s.nome AS setor, uc.nome AS unidade, i.nome AS instrumento, 
-                   oe.descricao AS objetivo, et.nome AS eixo_tematico, am.nome AS acao_manejo, rc.preenchido_em
+            SELECT rc.id, u.nome AS nome, s.nome AS setor, uc.nome AS unidade, i.nome AS instrumento, 
+                   oe.descricao AS objetivo, et.nome AS eixo_tematico, am.nome AS acao_manejo, 
+                   rc.preenchido_em, rc.descricao_instrumento AS descricao_instrumento
             FROM relacionamentos_coleta rc
             JOIN usuarios u ON rc.usuario_id = u.id
             JOIN setor s ON rc.setor_id = s.id
@@ -307,10 +293,7 @@ def obter_vinculacao_por_id(vinc_id):
         st.error(f"Erro ao obter a vinculação: {e}")
         return None
 
-def editar_vinculacao(vinc_id, setor, unidade, instrumento, objetivo, eixo_tematico, acao_manejo):
-    """
-    Atualiza a vinculação com o ID especificado.
-    """
+def editar_vinculacao(vinc_id, setor, unidade, instrumento, objetivo, eixo_tematico, acao_manejo, descricao_instrumento):
     try:
         conn = conectar_banco()
         cur = conn.cursor()
@@ -318,8 +301,7 @@ def editar_vinculacao(vinc_id, setor, unidade, instrumento, objetivo, eixo_temat
         setor_id = get_id(cur, 'setor', 'nome', setor)
         unidade_id = get_id(cur, 'unidade_conservacao', 'nome', unidade)
         instrumento_id = get_id(cur, 'instrumento', 'nome', instrumento)
-        
-        # Para o objetivo, se não existir, inserir e obter o id
+     
         objetivo_id = get_id(cur, 'objetivo_especifico', 'descricao', objetivo)
         if not objetivo_id:
             cur.execute(
@@ -328,18 +310,19 @@ def editar_vinculacao(vinc_id, setor, unidade, instrumento, objetivo, eixo_temat
             )
             objetivo_id = cur.fetchone()[0]
             conn.commit()
-        
+     
         eixo_id = get_id(cur, 'eixo_tematico', 'nome', eixo_tematico) if eixo_tematico and eixo_tematico != 'Nenhuma' else None
         acao_id = get_id(cur, 'acao_manejo', 'nome', acao_manejo) if acao_manejo and acao_manejo != 'Nenhuma' else None
 
         cur.execute(
             """
             UPDATE relacionamentos_coleta
-            SET setor_id = %s, unidade_id = %s, instrumento_id = %s, objetivo_id = %s,
-                eixo_tematico_id = %s, acao_manejo_id = %s, preenchido_em = %s
+            SET setor_id = %s, unidade_id = %s, instrumento_id = %s, descricao_instrumento = %s,
+                objetivo_id = %s, eixo_tematico_id = %s, acao_manejo_id = %s, preenchido_em = %s
             WHERE id = %s
             """,
-            (setor_id, unidade_id, instrumento_id, objetivo_id, eixo_id, acao_id, datetime.now(), vinc_id)
+            (setor_id, unidade_id, instrumento_id, descricao_instrumento,
+             objetivo_id, eixo_id, acao_id, datetime.now(), vinc_id)
         )
         conn.commit()
         cur.close()

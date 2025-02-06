@@ -6,6 +6,7 @@ from models.database import conectar_banco, obter_dados
 from controllers.vinculations_controller import salvar_vinculacoes, coletar_dados_para_exportar
 from utils.export_utils import exportar_para_excel
 from utils.validation import validar_campos
+from views.components.toast import show_toast
 
 def update_usuario_setor(cpf, novo_setor):
     """
@@ -56,7 +57,7 @@ def render_identificacao():
         st.session_state["user_registrado"] = True
         st.session_state["setor_registrado"] = setor
         st.session_state["cpf"] = cpf
-        st.info(f"Bem-vindo de volta, {nome_usuario}!")
+        show_toast(f"Bem-vindo de volta, {nome_usuario}!","info")
         st.text_input("Nome", value=nome_usuario, disabled=True, key="nome_usuario_input")
         st.text_input("Setor", value=setor, disabled=True, key="setor_usuario_input")
     else:

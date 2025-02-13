@@ -189,14 +189,16 @@ def coletar_dados_para_exportar(usuario, setor_escolhido, instrumentos_unidades,
                     acoes = acoes_por_eixo.get(chave_acao, [])
                     if acoes:
                         for acao in acoes:
+                            # Verifica se 'acao' é um dicionário com a chave 'nome'
+                            acao_nome = acao['nome'] if isinstance(acao, dict) and 'nome' in acao else acao
                             dados.append([
                                 setor_escolhido,
                                 uc,
-                                desc,         # Adiciona a descrição do instrumento
+                                desc,         # Descrição do instrumento
                                 inst_nome,
                                 objetivo,
                                 eixo,
-                                acao,         # Ação de Manejo
+                                acao_nome,    # Ação de Manejo: exibe o nome
                                 usuario,
                                 datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                             ])
@@ -204,7 +206,7 @@ def coletar_dados_para_exportar(usuario, setor_escolhido, instrumentos_unidades,
                         dados.append([
                             setor_escolhido,
                             uc,
-                            desc,         # Adiciona a descrição do instrumento
+                            desc,         # Descrição do instrumento
                             inst_nome,
                             objetivo,
                             eixo,

@@ -117,13 +117,11 @@ def render_instrumentos_unidades():
       - instrumentos_unidades: dicionário onde a chave é o instrumento (tupla: (id, nome)) e o valor é a(s) UC(s) selecionada(s)
       - descricao_instrumento: dicionário onde a chave é o instrumento e o valor é a descrição informada
     """
-    # Consulta a lista de instrumentos (cada registro é uma tupla: (id, nome))
     instrumentos = obter_dados("SELECT id, nome FROM instrumento")
     if not instrumentos:
         st.error("Nenhum instrumento encontrado.")
         st.stop()
 
-    # Seleção múltipla de instrumentos
     instrumentos_selecionados = st.multiselect(
         "Selecione os Instrumentos",
         options=instrumentos,
@@ -133,16 +131,13 @@ def render_instrumentos_unidades():
         help="Selecione um ou mais instrumentos conforme aplicável."
     )
 
-    # Consulta as unidades de conservação
     unidades = obter_dados("SELECT DISTINCT nome FROM unidade_conservacao", single_column=True)
 
     instrumentos_unidades = {}
     if instrumentos_selecionados:
         if len(instrumentos_selecionados) == 1:
-            # Se apenas um instrumento for selecionado
             instrumento = instrumentos_selecionados[0]
             if instrumento[0] == 8:
-                # Caso PANs, permite selecionar várias UCs
                 ucs = st.multiselect(
                     f"Selecione as Unidades de Conservação para o instrumento '{instrumento[1]}' (PANs)",
                     options=unidades,
@@ -159,7 +154,6 @@ def render_instrumentos_unidades():
                 ucs = [uc] if uc else []
             instrumentos_unidades[instrumento] = ucs
         elif len(instrumentos_selecionados) > 1:
-            # Se mais de um instrumento for selecionado, exibe apenas um campo para UC comum a todos
             uc = st.selectbox(
                 "Selecione a Unidade de Conservação (única para todos os instrumentos)",
                 options=unidades,
@@ -171,7 +165,6 @@ def render_instrumentos_unidades():
             for instrumento in instrumentos_selecionados:
                 instrumentos_unidades[instrumento] = ucs
 
-    # Captura a descrição específica para cada instrumento selecionado
     descricao_instrumento = {}
     if instrumentos_selecionados:
         st.markdown("### Descrição Específica dos Instrumentos")
@@ -241,7 +234,6 @@ def render_eixos(objetivos_por_instrumento):
     st.markdown("<h3 class='subsection-header'>Eixos Temáticos</h3>", unsafe_allow_html=True)
     st.info("Selecione os eixos temáticos relacionados aos objetivos.")
 
-    # Para cada instrumento e seus objetivos
     for chave_inst, objetivos in objetivos_por_instrumento.items():
         inst_id, inst_nome = chave_inst
         for objetivo in objetivos:
@@ -258,7 +250,7 @@ def render_eixos(objetivos_por_instrumento):
 
 def render_acoes(eixos_por_objetivo):
     """
-    Permite a seleção das ações de manejo correspondentes a cada eixo temático.
+    Permite a seleção das ações de manejo correspondentes aos eixos temáticos.
     """
     acoes_por_eixo = {}
     st.markdown("<hr>", unsafe_allow_html=True)
@@ -300,7 +292,8 @@ def render_acoes(eixos_por_objetivo):
                     key=f"acao_{inst_id}_{objetivo}_{eixo}"
                 )
                 acoes_por_eixo[(inst_id, inst_nome, objetivo, eixo)] = [
-                    key for key, value in acoes_dict.items() if value in acoes_selecionadas
+                    {"id": key, "nome": value} 
+                    for key, value in acoes_dict.items() if value in acoes_selecionadas
                 ]
             else:
                 st.error(f"Formato inválido ao retornar as ações para o eixo '{eixo}'.")
@@ -350,7 +343,6 @@ def render_resumo(setor_escolhido, instrumentos_unidades, objetivos_por_instrume
     st.markdown(resumo_md, unsafe_allow_html=True)
 
 def render():
-    # Injetando CSS customizado para padronização
     st.markdown(
         """
         <style>
@@ -395,25 +387,12 @@ def render():
     
     st.info("Preencha as informações abaixo para registrar as associações. Por favor, siga as instruções cuidadosamente.")
 
-    # 1) Identificação
     cpf, nome_usuario, setor_inicial = render_identificacao()
-
-    # 2) Setor (com opção de alteração)
     setor_escolhido = render_setor()
-
-    # 3) Seleção de Instrumentos e respectiva Unidade de Conservação
     instrumentos_unidades, descricao_instrumento = render_instrumentos_unidades()
-
-    # 4) Objetivos específicos para cada instrumento
     objetivos_por_instrumento = render_objetivos(instrumentos_unidades)
-
-    # 5) Seleção dos eixos temáticos para cada objetivo
     eixos_por_objetivo = render_eixos(objetivos_por_instrumento)
-
-    # 6) Seleção das ações de manejo para cada eixo temático
     acoes_por_eixo = render_acoes(eixos_por_objetivo)
-
-    # 7) Resumo das vinculações
     render_resumo(
         setor_escolhido,
         instrumentos_unidades,
@@ -422,7 +401,6 @@ def render():
         acoes_por_eixo
     )
 
-    # 8) Exportação para Excel (se houver dados)
     dados_para_exportar = coletar_dados_para_exportar(
         cpf,
         setor_escolhido,
@@ -443,27 +421,46 @@ def render():
             help="Clique para baixar um arquivo Excel com os dados preenchidos."
         )
 
-    # 9) Botão Salvar (com validação)
-    if st.button("Salvar Dados"):
-        if validar_campos(
-            cpf,
-            setor_escolhido,
-            instrumentos_unidades,
-            objetivos_por_instrumento,
-            eixos_por_objetivo
-        ):
-            salvar_vinculacoes(
+    if "dados_salvos" not in st.session_state:
+        st.session_state["dados_salvos"] = False
+
+    if not st.session_state["dados_salvos"]:
+        if st.button("Salvar Dados"):
+            if validar_campos(
                 cpf,
-                nome_usuario,
                 setor_escolhido,
                 instrumentos_unidades,
                 objetivos_por_instrumento,
-                eixos_por_objetivo,
-                acoes_por_eixo,
-                descricao_instrumento
-            )
-        else:
-            st.warning("Por favor, preencha todos os campos obrigatórios antes de salvar.")
+                eixos_por_objetivo
+            ):
+                # Converter as ações para somente o id, pois a coluna no banco espera um valor inteiro
+                acoes_convertidas = {}
+                for chave, acoes in acoes_por_eixo.items():
+                    acoes_convertidas[chave] = [
+                        acao['id'] if isinstance(acao, dict) and 'id' in acao else acao
+                        for acao in acoes
+                    ]
+                salvar_vinculacoes(
+                    cpf,
+                    nome_usuario,
+                    setor_escolhido,
+                    instrumentos_unidades,
+                    objetivos_por_instrumento,
+                    eixos_por_objetivo,
+                    acoes_convertidas,
+                    descricao_instrumento
+                )
+                st.session_state["dados_salvos"] = True
+                st.success("Dados salvos com sucesso!")
+            else:
+                st.warning("Por favor, preencha todos os campos obrigatórios antes de salvar.")
+    else:
+        if st.button("Deseja preencher novamente?"):
+            # Remove as chaves do formulário, mantendo CPF, usuário e setor
+            for key in list(st.session_state.keys()):
+                if key not in ["cpf", "user_registrado", "setor_registrado", "dados_salvos"]:
+                    del st.session_state[key]
+            st.session_state["dados_salvos"] = False
 
 if __name__ == "__main__":
     render()

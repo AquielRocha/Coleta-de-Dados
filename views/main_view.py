@@ -71,6 +71,7 @@ def render_identificacao():
         setor = st.selectbox(
             "Selecione o Setor",
             setores,
+            placeholder="Setores disponíveis",
             help="Escolha o setor onde a atividade ocorrerá.",
             key="setor_selectbox"
         )

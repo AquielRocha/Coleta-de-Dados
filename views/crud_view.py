@@ -1,10 +1,7 @@
-# views/crud_view.py
-
 import streamlit as st
 import pandas as pd
 from controllers.vinculations_controller import listar_vinculacoes, editar_vinculacao, deletar_vinculacao
 from models.database import obter_dados
-
 
 def carregar_registros(cpf_input):
     """
@@ -21,7 +18,6 @@ def carregar_registros(cpf_input):
     
     return records
 
-
 def exibir_registros(records):
     """
     Exibe os registros em formato de tabela, ocultando o ID para visualização.
@@ -30,26 +26,21 @@ def exibir_registros(records):
       [5]=Objetivo, [6]=Eixo Temático, [7]=Ação de Manejo, [8]=Preenchido em,
       [9]=Descrição do Instrumento.
     """
-    # Cria o DataFrame com a ordem desejada.
-    # Aqui vamos reordenar os campos para que apareçam da forma que você deseja:
-    # Por exemplo: Setor, Unidade, Descrição do Instrumento, Instrumento, Objetivo, Eixo Temático, Ação de Manejo, Nome, Preenchido em
     df = pd.DataFrame(
         records,
         columns=[
-            "ID",                    # [0]
-            "Nome",                  # [1] - nome do usuário
-            "Setor",                 # [2]
-            "Unidade",               # [3]
-            "Instrumento",           # [4]
-            "Objetivo",              # [5]
-            "Eixo Temático",         # [6]
-            "Ação de Manejo",        # [7]
-            "Preenchido em",         # [8]
-            "Descrição do Instrumento"  # [9]
+            "ID",                    
+            "Nome",                  
+            "Setor",                 
+            "Unidade",               
+            "Instrumento",           
+            "Objetivo",              
+            "Eixo Temático",         
+            "Ação de Manejo",        
+            "Preenchido em",         
+            "Descrição do Instrumento"
         ]
     )
-    # Reorganiza as colunas para a visualização (ocultando o ID e invertendo a ordem, se necessário).
-    # Por exemplo, podemos reordenar para:
     ordem_exibicao = [
         "Setor",
         "Unidade",
@@ -66,11 +57,9 @@ def exibir_registros(records):
     st.subheader("Registros de Manejo do seu setor")
     st.dataframe(df_exibicao, use_container_width=True)
 
-
 def obter_opcoes_cadastro():
     """
     Obtém as opções para cada campo a partir do banco de dados.
-    Aqui passamos single_column=True para retornar lista de strings, não tuplas.
     """
     setores_options = obter_dados(
         "SELECT DISTINCT nome FROM setor",
@@ -100,14 +89,12 @@ def obter_opcoes_cadastro():
         acoes_options,
     )
 
-
 def render_edit_delete_form(records):
     """
     Renderiza o formulário para edição e deleção dos registros.
     Cada registro em 'records' deve ter a estrutura:
       (id, nome, setor, unidade, instrumento, objetivo, eixo temático, ação de manejo, preenchido_em, descricao_instrumento)
     """
-    # Cria um dicionário de opções para seleção do registro
     options = {
         f"Unidade: {r[3]} | Instrumento: {r[4]} | Objetivo: {r[5]}": r
         for r in records
@@ -123,14 +110,12 @@ def render_edit_delete_form(records):
     st.markdown("### Dados Selecionados para Edição")
     st.write("Confira os dados abaixo. O campo **CPF/Nome** é somente leitura. Você pode alterar os demais campos, se necessário.")
     
-    # Exibe o Nome em modo somente leitura (índice [1])
     st.text_input(
         "Nome (somente leitura)",
         value=selected_record[1],
         disabled=True
     )
 
-    # Carrega as opções (já em formato de lista de strings)
     (
         setores_options,
         unidades_options,
@@ -139,7 +124,6 @@ def render_edit_delete_form(records):
         acoes_options,
     ) = obter_opcoes_cadastro()
 
-    # Setor
     try:
         setor = st.selectbox(
             "Selecione o Setor",
@@ -149,9 +133,8 @@ def render_edit_delete_form(records):
         )
     except Exception as e:
         st.error(f"Erro ao carregar o setor: {e}")
-        setor = selected_record[2]  # fallback
+        setor = selected_record[2]
 
-    # Unidade
     try:
         unidade = st.selectbox(
             "Selecione a Unidade de Conservação",
@@ -161,9 +144,8 @@ def render_edit_delete_form(records):
         )
     except Exception as e:
         st.error(f"Erro ao carregar a unidade: {e}")
-        unidade = selected_record[3]  # fallback
+        unidade = selected_record[3]
 
-    # Instrumento
     try:
         instrumento = st.selectbox(
             "Selecione o Instrumento",
@@ -173,16 +155,14 @@ def render_edit_delete_form(records):
         )
     except Exception as e:
         st.error(f"Erro ao carregar o instrumento: {e}")
-        instrumento = selected_record[4]  # fallback
+        instrumento = selected_record[4]
 
-    # Objetivo
     objetivo = st.text_input(
         "Digite o Objetivo",
         value=selected_record[5],
         help="Edite o objetivo conforme necessário. Este campo permite entrada livre de texto."
     )
 
-    # Eixo Temático
     try:
         eixo_tematico = st.selectbox(
             "Selecione o Eixo Temático",
@@ -192,9 +172,8 @@ def render_edit_delete_form(records):
         )
     except Exception as e:
         st.error(f"Erro ao carregar o eixo temático: {e}")
-        eixo_tematico = selected_record[6]  # fallback
+        eixo_tematico = selected_record[6]
 
-    # Ação de Manejo
     try:
         acao_manejo = st.selectbox(
             "Selecione a Ação de Manejo",
@@ -204,9 +183,8 @@ def render_edit_delete_form(records):
         )
     except Exception as e:
         st.error(f"Erro ao carregar a ação de manejo: {e}")
-        acao_manejo = selected_record[7]  # fallback
+        acao_manejo = selected_record[7]
 
-    # Adicione o input para a Descrição do Instrumento (índice [9])
     descricao_instrumento = st.text_input(
         "Digite a Descrição do Instrumento",
         value=selected_record[9] if len(selected_record) > 9 else "",
@@ -230,7 +208,6 @@ def render_edit_delete_form(records):
                 descricao_instrumento=descricao_instrumento
             )
             st.success("Alterações salvas com sucesso!")
-            # Limpa os registros em cache para forçar recarregar da base
             if "records" in st.session_state:
                 del st.session_state["records"]
 
@@ -248,32 +225,68 @@ def render_edit_delete_form(records):
             else:
                 st.warning("Por favor, confirme que deseja deletar este registro.")
 
-
 def render_crud_view():
-    st.markdown("<h1 style='color:#E5EFE3;'>Visualização e Gerenciamento</h1>", unsafe_allow_html=True)
+    # Injeção do CSS padronizado para o módulo
+    st.markdown(
+        """
+        <style>
+            :root {
+                --primary-color: #2C3E50;
+                --secondary-color: #3498DB;
+                --hover-color: #2980B9;
+                --header-font: 'Arial', sans-serif;
+                --body-font: 'Arial', sans-serif;
+            }
+            body {
+                font-family: var(--body-font);
+            }
+            h1, h2, h3, h4 {
+                color: var(--primary-color);
+            }
+            .stButton button {
+                background-color: var(--secondary-color);
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 0.5em 1em;
+            }
+            .stButton button:hover {
+                background-color: var(--hover-color);
+            }
+            .section-header {
+                font-size: 28px;
+                margin-bottom: 1rem;
+            }
+            .subsection-header {
+                font-size: 24px;
+                margin-bottom: 0.75rem;
+            }
+        </style>
+        """, unsafe_allow_html=True
+    )
+    
+    st.markdown("<h1 class='section-header'>Visualização e Gerenciamento</h1>", unsafe_allow_html=True)
     st.info("Informe seu CPF para visualizar e gerenciar as informações de manejo. Somente registros vinculados ao setor do usuário serão exibidos.")
 
     cpf_input = st.text_input(
         "Digite seu CPF:",
         max_chars=11,
+        placeholder="Digite somente os números do CPF, sem pontos ou traços.",
         help="Somente números, sem pontos ou traços."
     )
 
-    # Se os registros ainda não foram carregados, exibe o botão para carregá-los
     if "records" not in st.session_state:
         if st.button("Carregar dados do Usuário"):
             records = carregar_registros(cpf_input)
             if records is None:
-                return  # Se não encontrou registros ou CPF inválido, interrompe
+                return
             st.session_state["records"] = records
             st.session_state["cpf"] = cpf_input
         else:
             return
 
-    # Se já temos "records" armazenados na sessão
     records = st.session_state["records"]
 
-    # Exibe os registros em tabela
     exibir_registros(records)
 
     st.markdown("---")

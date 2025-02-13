@@ -1,7 +1,7 @@
 import streamlit as st
 from datetime import datetime
 
-# Import das suas funções de banco e controladores
+# Import das funções de banco e controladores
 from models.database import conectar_banco, obter_dados
 from controllers.vinculations_controller import salvar_vinculacoes, coletar_dados_para_exportar
 from utils.export_utils import exportar_para_excel
@@ -29,6 +29,7 @@ def update_usuario_setor(cpf, novo_setor):
 def render_identificacao():
     cpf = st.text_input(
         "Digite seu CPF:",
+        placeholder="Digite somente os números do CPF, sem pontos ou traços.",
         max_chars=11,
         help="Digite somente os números do CPF, sem pontos ou traços.",
         key="cpf_input"
@@ -57,9 +58,7 @@ def render_identificacao():
         st.session_state["user_registrado"] = True
         st.session_state["setor_registrado"] = setor
         st.session_state["cpf"] = cpf
-        show_toast(f"Bem-vindo de volta, {nome_usuario}!","info")
-        st.text_input("Nome", value=nome_usuario, disabled=True, key="nome_usuario_input")
-        st.text_input("Setor", value=setor, disabled=True, key="setor_usuario_input")
+        show_toast(f"Bem-vindo de volta, {nome_usuario}!", "info")
     else:
         st.session_state["user_registrado"] = False
         nome_usuario = st.text_input(
@@ -128,6 +127,7 @@ def render_instrumentos_unidades():
         "Selecione os Instrumentos",
         options=instrumentos,
         format_func=lambda x: x[1],
+        placeholder="Instrumentos disponíveis",
         key="instrumento_multiselect",
         help="Selecione um ou mais instrumentos conforme aplicável."
     )
@@ -162,6 +162,7 @@ def render_instrumentos_unidades():
             uc = st.selectbox(
                 "Selecione a Unidade de Conservação (única para todos os instrumentos)",
                 options=unidades,
+                placeholder="Unidade de Conservação",
                 key="uc_common_selectbox",
                 help="A UC selecionada será aplicada a todos os instrumentos."
             )
@@ -169,13 +170,14 @@ def render_instrumentos_unidades():
             for instrumento in instrumentos_selecionados:
                 instrumentos_unidades[instrumento] = ucs
 
-    # Agora, adicionar a captura de descrição para cada instrumento selecionado
+    # Captura a descrição específica para cada instrumento selecionado
     descricao_instrumento = {}
     if instrumentos_selecionados:
         st.markdown("### Descrição Específica dos Instrumentos")
         for instrumento in instrumentos_selecionados:
             descricao = st.text_input(
                 f"Digite a descrição para o instrumento '{instrumento[1]}'",
+                placeholder="Descrição específica",
                 key=f"desc_instrumento_{instrumento[0]}",
                 help="Informe uma descrição específica para este instrumento."
             )
@@ -192,7 +194,7 @@ def render_objetivos(instrumentos_unidades):
         st.session_state["objetivos_por_instrumento"] = {}
 
     st.markdown("<hr>", unsafe_allow_html=True)
-    st.markdown("<h2 style='font-size:28px; color:#E6F0F3;'>Objetivos Específicos</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='section-header'>Objetivos Específicos</h2>", unsafe_allow_html=True)
 
     for instrumento, ucs in instrumentos_unidades.items():
         chave_inst = (instrumento[0], instrumento[1])
@@ -202,6 +204,7 @@ def render_objetivos(instrumentos_unidades):
 
         novo_objetivo = st.text_input(
             f"Digite um objetivo específico para '{instrumento[1]}':",
+            placeholder="Objetivo ",
             key=f"novo_obj_{instrumento[0]}",
             help="Insira um objetivo específico para este instrumento."
         )
@@ -223,10 +226,7 @@ def render_objetivos(instrumentos_unidades):
                 with col2:
                     if st.button("Remover", key=f"remove_obj_{instrumento[0]}_{idx}_button"):
                         st.session_state["objetivos_por_instrumento"][chave_inst].pop(idx - 1)
-                        # Atualiza a interface após a remoção (se necessário)
     return st.session_state["objetivos_por_instrumento"]
-
-
 
 def render_eixos(objetivos_por_instrumento):
     """
@@ -237,7 +237,7 @@ def render_eixos(objetivos_por_instrumento):
         st.session_state["eixos_por_objetivo"] = {}
 
     st.markdown("<hr>", unsafe_allow_html=True)
-    st.markdown("<h3 style='font-size:24px; color:#E6F0F3;'>Eixos Temáticos</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 class='subsection-header'>Eixos Temáticos</h3>", unsafe_allow_html=True)
     st.info("Selecione os eixos temáticos relacionados aos objetivos.")
 
     # Para cada instrumento e seus objetivos
@@ -248,6 +248,7 @@ def render_eixos(objetivos_por_instrumento):
             eixos_selecionados = st.multiselect(
                 f"Selecione os eixos para o objetivo '{objetivo}' no instrumento '{inst_nome}':",
                 options=eixos,
+                placeholder="Eixos disponíveis",
                 key=f"eixo_{inst_id}_{objetivo}"
             )
             st.session_state["eixos_por_objetivo"][chave_obj] = eixos_selecionados
@@ -260,7 +261,7 @@ def render_acoes(eixos_por_objetivo):
     """
     acoes_por_eixo = {}
     st.markdown("<hr>", unsafe_allow_html=True)
-    st.markdown("<h4 style='font-size:20px; color:#E6F0F3;'>Ações de Manejo</h4>", unsafe_allow_html=True)
+    st.markdown("<h4 class='small-header'>Ações de Manejo</h4>", unsafe_allow_html=True)
     st.info("Selecione as ações de manejo correspondentes aos eixos temáticos.")
 
     for (inst_id, inst_nome, objetivo), eixos in st.session_state["eixos_por_objetivo"].items():
@@ -285,7 +286,6 @@ def render_acoes(eixos_por_objetivo):
                 st.warning(f"Não foram encontradas ações de manejo para o eixo '{eixo}'.")
                 continue
 
-            # Verifica se o retorno possui o formato adequado: lista de tuplas (id, nome)
             formato_ok = (
                 isinstance(acoes_relacionadas, list)
                 and all(isinstance(acao, tuple) and len(acao) == 2 for acao in acoes_relacionadas)
@@ -294,6 +294,7 @@ def render_acoes(eixos_por_objetivo):
                 acoes_dict = {acao[0]: acao[1] for acao in acoes_relacionadas}
                 acoes_selecionadas = st.multiselect(
                     f"Selecione as ações para o eixo '{eixo}' (Objetivo: {objetivo}, Instrumento: {inst_nome})",
+                    placeholder="Ações disponíveis",
                     options=list(acoes_dict.values()),
                     key=f"acao_{inst_id}_{objetivo}_{eixo}"
                 )
@@ -312,7 +313,7 @@ def render_resumo(setor_escolhido, instrumentos_unidades, objetivos_por_instrume
     Monta um resumo hierárquico das vinculações para visualização.
     """
     st.markdown("<hr>", unsafe_allow_html=True)
-    st.markdown("<h2 style='font-size:24px; color:#E6F0F3;'>Resumo das Vinculações</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='section-header'>Resumo das Vinculações</h2>", unsafe_allow_html=True)
 
     resumo_md = f"**Setor Selecionado**: {setor_escolhido}\n\n"
 
@@ -332,7 +333,6 @@ def render_resumo(setor_escolhido, instrumentos_unidades, objetivos_por_instrume
                         resumo_md += f"  - **Eixo Temático**: {eixo}\n"
                         acoes = acoes_por_eixo.get((inst_id, inst_nome, obj, eixo), [])
                         if acoes:
-                            # Realiza um join utilizando o nome da ação, se disponível
                             acoes_nomes = ", ".join(
                                 [acao['nome'] if isinstance(acao, dict) and 'nome' in acao else str(acao)
                                  for acao in acoes]
@@ -344,14 +344,55 @@ def render_resumo(setor_escolhido, instrumentos_unidades, objetivos_por_instrume
                     resumo_md += "  - **Eixos Temáticos**: Nenhum\n"
         else:
             resumo_md += "Nenhum objetivo adicionado.\n"
-        # Separador para visualização mais clara de cada instrumento
         resumo_md += "\n---\n\n"
 
     st.markdown(resumo_md, unsafe_allow_html=True)
 
 def render():
-    st.markdown("<h1 style='color:#E5EFE3;'>Gestão de Manejo - ICMBio</h1>", unsafe_allow_html=True)
-    st.info("Preencha as informações abaixo para registrar as vinculações de manejo. Por favor, siga as instruções cuidadosamente.")
+    # Injetando CSS customizado para padronização
+    st.markdown(
+        """
+        <style>
+            :root {
+                --primary-color: #2C3E50;
+                --secondary-color: #3498DB;
+                --hover-color: #2980B9;
+                --header-font: 'Arial', sans-serif;
+                --body-font: 'Arial', sans-serif;
+            }
+            body {
+                font-family: var(--body-font);
+            }
+            h1, h2, h3, h4 {
+                color: var(--primary-color);
+            }
+            .stButton button {
+                background-color: var(--secondary-color);
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 0.5em 1em;
+            }
+            .stButton button:hover {
+                background-color: var(--hover-color);
+            }
+            .section-header {
+                font-size: 28px;
+                margin-bottom: 1rem;
+            }
+            .subsection-header {
+                font-size: 24px;
+                margin-bottom: 0.75rem;
+            }
+            .small-header {
+                font-size: 20px;
+                margin-bottom: 0.5rem;
+            }
+        </style>
+        """, unsafe_allow_html=True
+    )
+    
+    st.info("Preencha as informações abaixo para registrar as associações. Por favor, siga as instruções cuidadosamente.")
 
     # 1) Identificação
     cpf, nome_usuario, setor_inicial = render_identificacao()
@@ -388,7 +429,7 @@ def render():
         objetivos_por_instrumento,
         eixos_por_objetivo,
         acoes_por_eixo,
-        descricao_instrumento  # Agora, a função aceita esse parâmetro
+        descricao_instrumento
     )
 
     if dados_para_exportar:
@@ -418,7 +459,7 @@ def render():
                 objetivos_por_instrumento,
                 eixos_por_objetivo,
                 acoes_por_eixo,
-                descricao_instrumento  # Passando as descrições para o controller, se necessário.
+                descricao_instrumento
             )
         else:
             st.warning("Por favor, preencha todos os campos obrigatórios antes de salvar.")

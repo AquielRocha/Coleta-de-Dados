@@ -1,17 +1,21 @@
 import psycopg2
 import streamlit as st
+from dotenv import load_dotenv
+import os
+
+# Carregar variáveis de ambiente do arquivo .env
+load_dotenv()
 
 def conectar_banco():
     """
-    Conecta ao banco de dados PostgreSQL.
-    Ajuste os parâmetros conforme suas credenciais.
+    Conecta ao banco de dados PostgreSQL de forma segura usando variáveis de ambiente.
     """
     return psycopg2.connect(
-        dbname="db_samge_hmg",
-        user="samge_read",
-        password="samge_read",
-        host="162.243.243.165",
-        port="5432"
+        dbname=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT")
     )
 
 @st.cache_data(ttl=600)  # Cache por 10 minutos
@@ -21,7 +25,7 @@ def obter_dados(query, params=None, single_column=False):
     - query: string com a consulta (ex.: "SELECT nome FROM tabela").
     - params: tupla ou lista de parâmetros para a consulta parametrizada.
     - single_column: se True, e a query tiver só 1 coluna, retorna lista de valores (strings/ints).
-                     caso contrário, retorna lista de tuplas.
+                     Caso contrário, retorna lista de tuplas.
     """
     try:
         conn = conectar_banco()

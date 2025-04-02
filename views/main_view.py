@@ -8,6 +8,11 @@ from utils.export_utils import exportar_para_excel
 from utils.validation import validar_campos
 from views.components.toast import show_toast
 
+# Função de cache para consultas que não mudam com frequência
+@st.cache_data(show_spinner=False)
+def get_cached_data(query, single_column=False):
+    return obter_dados(query, single_column=single_column)
+
 def update_usuario_setor(cpf, novo_setor):
     """
     Atualiza o setor do usuário no banco de dados.
@@ -69,7 +74,8 @@ def render_identificacao():
             key="nome_usuario"
         ).strip()
 
-        setores = obter_dados("SELECT DISTINCT nome FROM setor", single_column=True)
+        # Usa cache para carregar os setores, evitando nova consulta a cada renderização
+        setores = get_cached_data("SELECT DISTINCT nome FROM setor", single_column=True)
         setor = st.selectbox(
             "Selecione o Setor",
             setores,
@@ -85,7 +91,7 @@ def render_setor():
     """
     Exibe o setor atual e possibilita a alteração se necessário.
     """
-    setores = obter_dados("SELECT DISTINCT nome FROM setor", single_column=True)
+    setores = get_cached_data("SELECT DISTINCT nome FROM setor", single_column=True)
     if st.session_state.get("user_registrado"):
         atual = st.session_state["setor_registrado"]
         st.info(f"Setor atual: {atual}.")
@@ -119,7 +125,7 @@ def render_instrumentos_unidades():
       - instrumentos_unidades: dicionário onde a chave é o instrumento (tupla: (id, nome)) e o valor é a(s) UC(s) selecionada(s)
       - descricao_instrumento: dicionário onde a chave é o instrumento e o valor é a descrição informada
     """
-    instrumentos = obter_dados("SELECT id, nome FROM instrumento")
+    instrumentos = get_cached_data("SELECT id, nome FROM instrumento")
     if not instrumentos:
         st.error("Nenhum instrumento encontrado.")
         st.stop()
@@ -133,7 +139,7 @@ def render_instrumentos_unidades():
         help="Selecione um ou mais instrumentos conforme aplicável."
     )
 
-    unidades = obter_dados("SELECT DISTINCT nome FROM unidade_conservacao", single_column=True)
+    unidades = get_cached_data("SELECT DISTINCT nome FROM unidade_conservacao", single_column=True)
 
     instrumentos_unidades = {}
     if instrumentos_selecionados:
@@ -228,7 +234,7 @@ def render_eixos(objetivos_por_instrumento):
     """
     Permite a seleção dos eixos temáticos para cada objetivo de cada instrumento.
     """
-    eixos = obter_dados("SELECT nome FROM eixo_tematico", single_column=True)
+    eixos = get_cached_data("SELECT nome FROM eixo_tematico", single_column=True)
     if "eixos_por_objetivo" not in st.session_state:
         st.session_state["eixos_por_objetivo"] = {}
 

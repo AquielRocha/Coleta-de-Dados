@@ -208,8 +208,10 @@ def render_edit_delete_form(records):
                 descricao_instrumento=descricao_instrumento
             )
             st.success("Alterações salvas com sucesso!")
+            # Remove os registros do session_state para forçar o recarregamento
             if "records" in st.session_state:
                 del st.session_state["records"]
+            st.rerun()
 
     with col2:
         if st.button("Deletar Registro"):
@@ -222,6 +224,7 @@ def render_edit_delete_form(records):
                 st.success("Registro deletado com sucesso!")
                 if "records" in st.session_state:
                     del st.session_state["records"]
+                st.rerun()
             else:
                 st.warning("Por favor, confirme que deseja deletar este registro.")
 
@@ -292,3 +295,6 @@ def render_crud_view():
     st.markdown("---")
     st.subheader("Editar / Deletar Registros")
     render_edit_delete_form(records)
+
+if __name__ == "__main__":
+    render_crud_view()

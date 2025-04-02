@@ -23,6 +23,8 @@ def update_usuario_setor(cpf, novo_setor):
             conn.commit()
         cur.close()
         conn.close()
+        # Após atualizar, recarrega o app para refletir a mudança
+        st.rerun()
     except Exception as e:
         st.error(f"Erro ao atualizar setor do usuário: {e}")
 
@@ -452,6 +454,8 @@ def render():
                 )
                 st.session_state["dados_salvos"] = True
                 st.success("Dados salvos com sucesso!")
+                # Força a recarga da página para refletir os dados salvos
+                st.rerun()
             else:
                 st.warning("Por favor, preencha todos os campos obrigatórios antes de salvar.")
     else:
@@ -461,6 +465,7 @@ def render():
                 if key not in ["cpf", "user_registrado", "setor_registrado", "dados_salvos"]:
                     del st.session_state[key]
             st.session_state["dados_salvos"] = False
+            st.rerun()
 
 if __name__ == "__main__":
     render()

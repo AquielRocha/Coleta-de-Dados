@@ -1,16 +1,13 @@
-# ── web app ──────────────────────────────────────────────────────────────
-streamlit==1.34.0          # UI principal
-streamlit-shadcn-ui==0.1.18  # componentes shadcn para Streamlit
+streamlit==1.34.0
+streamlit-shadcn-ui==0.1.18
+streamlit-extras==0.3.6
 
-# ── banco de dados ───────────────────────────────────────────────────────
-psycopg2-binary==2.9.9     # driver PostgreSQL
+psycopg2-binary==2.9.9
 
-# ── data & utilitários ───────────────────────────────────────────────────
-pandas==2.2.1              # manipulação de dados
-numpy==1.26.4              # dependência do pandas
-python-dotenv==1.0.1       # variáveis de ambiente
+pandas==2.2.1
+numpy==1.26.4
+python-dotenv==1.0.1
 
-# ── geração de relatórios ────────────────────────────────────────────────
-fpdf2==2.7.8               # geração de PDFs (substitui o “fpdf” antigo)
-openpyxl==3.1.2            # leitura/escrita .xlsx
-XlsxWriter==3.2.0          # escrita avançada .xlsx
+fpdf2==2.7.8
+openpyxl==3.1.2
+XlsxWriter==3.2.0

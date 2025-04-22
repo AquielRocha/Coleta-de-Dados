@@ -4,62 +4,119 @@ from views import crud_view, main_view
 def main():
     st.set_page_config(page_title="Gestão de Manejo - ICMBio", layout="wide")
     
-    # CSS customizado para padronização (definindo cores e fontes via variáveis)
+    # Esconder o cabeçalho do deploy
+    hide_streamlit_style = """
+        <style>
+        #MainMenu {visibility: hidden;}
+        header {visibility: hidden;}
+        footer {visibility: hidden;}
+        </style>
+    """
+    st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+    
+    # CSS modernizado
     st.markdown(
         """
         <style>
             :root {
-                --primary-color: #2C3E50;
-                --secondary-color: #3498DB;
-                --hover-color: #2980B9;
-                --header-font: 'Arial', sans-serif;
-                --body-font: 'Arial', sans-serif;
+                --primary-color: #1a73e8;
+                --secondary-color: #7CB9E8;
+                --accent-color: #F0F8FF;
+                --text-color: #2c3e50;
+                --header-font: 'Helvetica Neue', sans-serif;
+                --body-font: 'Roboto', sans-serif;
             }
+            
             body {
                 font-family: var(--body-font);
+                color: var(--text-color);
             }
-            /* Estilo para o cabeçalho principal */
+            
+            /* Cabeçalho principal */
             .main-header {
                 font-family: var(--header-font);
-                font-size: 2.5em;
+                font-size: 2.2em;
                 color: var(--primary-color);
                 text-align: center;
-                margin-bottom: 1rem;
+                margin-bottom: 2rem;
+                font-weight: 600;
             }
-            /* Estilo para a sidebar */
+            
+            /* Sidebar */
             [data-testid="stSidebar"] {
-                background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-                color: white;
+                background: linear-gradient(180deg, var(--primary-color), var(--secondary-color));
+                padding: 2rem 1rem;
             }
-            [data-testid="stSidebar"] a {
-                color: white;
+            
+            /* Estilização dos selects */
+            .stSelectbox div[data-baseweb="select"] {
+                background-color: white;
+                border-radius: 8px;
+                border: 1px solid #e0e0e0;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             }
-            /* Ajuste de cores dos títulos e textos */
-            h1, h2, h3 {
-                color: var(--primary-color);
+            
+            .stSelectbox div[data-baseweb="select"]:hover {
+                border-color: var(--primary-color);
             }
-            /* Estilo para botões */
+            
+            /* Botões */
             .stButton button {
-                background-color: var(--secondary-color);
+                background-color: var(--primary-color);
                 color: white;
                 border: none;
-                border-radius: 5px;
-                padding: 0.5em 1em;
+                border-radius: 8px;
+                padding: 0.6em 1.2em;
+                font-weight: 500;
+                transition: all 0.3s ease;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }
+            
             .stButton button:hover {
-                background-color: var(--hover-color);
+                background-color: #f4f4f4;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+                transform: translateY(-1px);
+            }
+            
+            /* Tabs */
+            .stTabs [data-baseweb="tab-list"] {
+                gap: 8px;
+                border-radius: 8px;
+                padding: 0.5rem;
+            }
+            
+            .stTabs [data-baseweb="tab"] {
+                background-color: transparent;
+                border-radius: 6px;
+                color: var(--text-color);
+                font-weight: 500;
+            }
+            
+            .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+                background-color: white;
+                color: var(--primary-color);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            }
+            
+            /* Inputs e text areas */
+            .stTextInput input, .stTextArea textarea {
+                border-radius: 8px;
+                border: 1px solid #e0e0e0;
+                padding: 0.5rem;
+            }
+            
+            .stTextInput input:focus, .stTextArea textarea:focus {
+                border-color: var(--primary-color);
+                box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
             }
         </style>
         """, unsafe_allow_html=True
     )
     
-    # Cabeçalho centralizado (utilizando o estilo definido no CSS)
+    # Cabeçalho
     st.markdown("<h1 class='main-header'>Catálogo de Instrumentos e Objetivos - ICMBio</h1>", unsafe_allow_html=True)
     
-    # Se desejar, você pode incluir um logo na sidebar
-    # st.sidebar.image("logo.png", width=200)
-    
-    # Utilizando tabs para navegação
+    # Tabs
     tabs = st.tabs(["Consultar Catálogo dos Instrumentos", "Preencher novo formulário"])
     
     with tabs[0]:

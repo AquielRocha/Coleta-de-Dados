@@ -258,7 +258,6 @@ def render_crud_view():
         """, unsafe_allow_html=True
     )
     
-    st.markdown("<h1 class='section-header'>Visualização e Gerenciamento</h1>", unsafe_allow_html=True)
     st.info("Informe seu CPF para visualizar e gerenciar as informações de manejo. Somente registros vinculados ao setor do usuário serão exibidos.")
 
     cpf_input = st.text_input(

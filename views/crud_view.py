@@ -157,6 +157,11 @@ def render_edit_delete_form(records):
         st.error(f"Erro ao carregar o instrumento: {e}")
         instrumento = selected_record[4]
 
+    descricao_instrumento = st.text_input(
+        "Digite a Descrição do Instrumento",
+        value=selected_record[9] if len(selected_record) > 9 else "",
+        help="Edite a descrição do instrumento, se necessário."
+    )
     objetivo = st.text_input(
         "Digite o Objetivo",
         value=selected_record[5],
@@ -174,22 +179,17 @@ def render_edit_delete_form(records):
         st.error(f"Erro ao carregar o eixo temático: {e}")
         eixo_tematico = selected_record[6]
 
-    try:
-        acao_manejo = st.selectbox(
-            "Selecione a Ação de Manejo",
-            options=acoes_options,
-            index=acoes_options.index(selected_record[7]) if selected_record[7] in acoes_options else 0,
-            help="Selecione a ação de manejo adequada."
-        )
-    except Exception as e:
-        st.error(f"Erro ao carregar a ação de manejo: {e}")
-        acao_manejo = selected_record[7]
+    # try:
+    #     acao_manejo = st.selectbox(
+    #         "Selecione a Ação de Manejo",
+    #         options=acoes_options,
+    #         index=acoes_options.index(selected_record[7]) if selected_record[7] in acoes_options else 0,
+    #         help="Selecione a ação de manejo adequada."
+    #     )
+    # except Exception as e:
+    #     st.error(f"Erro ao carregar a ação de manejo: {e}")
+    #     acao_manejo = selected_record[7]
 
-    descricao_instrumento = st.text_input(
-        "Digite a Descrição do Instrumento",
-        value=selected_record[9] if len(selected_record) > 9 else "",
-        help="Edite a descrição do instrumento, se necessário."
-    )
 
     st.markdown("### Confirmação")
     st.info("Revise os dados alterados abaixo.")
@@ -204,7 +204,7 @@ def render_edit_delete_form(records):
                 instrumento=instrumento,
                 objetivo=objetivo,
                 eixo_tematico=eixo_tematico,
-                acao_manejo=acao_manejo,
+                # acao_manejo=acao_manejo,
                 descricao_instrumento=descricao_instrumento
             )
             st.success("Alterações salvas com sucesso!")

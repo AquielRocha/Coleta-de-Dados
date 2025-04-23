@@ -246,16 +246,6 @@ def render_crud_view():
             h1, h2, h3, h4 {
                 color: var(--primary-color);
             }
-            .stButton button {
-                background-color: var(--secondary-color);
-                color: white;
-                border: none;
-                border-radius: 5px;
-                padding: 0.5em 1em;
-            }
-            .stButton button:hover {
-                background-color: var(--hover-color);
-            }
             .section-header {
                 font-size: 28px;
                 margin-bottom: 1rem;
@@ -277,16 +267,15 @@ def render_crud_view():
         placeholder="Digite somente os números do CPF, sem pontos ou traços.",
         help="Somente números, sem pontos ou traços."
     )
-
-    if "records" not in st.session_state:
-        if st.button("Carregar dados do Usuário"):
-            records = carregar_registros(cpf_input)
-            if records is None:
-                return
-            st.session_state["records"] = records
-            st.session_state["cpf"] = cpf_input
-        else:
+    if not cpf_input.strip():
+        st.error("Por favor, informe um CPF válido.")
+        return
+    
+    if "records" not in st.session_state or st.session_state["cpf"] != cpf_input:
+        st.session_state["records"] = carregar_registros(cpf_input)
+        if st.session_state["records"] is None:
             return
+        st.session_state["cpf"] = cpf_input
 
     records = st.session_state["records"]
 

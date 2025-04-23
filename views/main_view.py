@@ -193,26 +193,28 @@ def render_objetivos(instrumentos_unidades):
     st.markdown("<h2 class='section-header'>Objetivos Específicos</h2>", unsafe_allow_html=True)
 
     for instrumento, ucs in instrumentos_unidades.items():
+        st.markdown(f"<h4>Instrumento: {instrumento[1]}</h4>", unsafe_allow_html=True)
         chave_inst = (instrumento[0], instrumento[1])
-        st.markdown(f"#### Instrumento: {instrumento[1]} (UC: {', '.join(ucs) if ucs else 'Nenhuma'})")
         if chave_inst not in st.session_state["objetivos_por_instrumento"]:
             st.session_state["objetivos_por_instrumento"][chave_inst] = []
 
-        novo_objetivo = st.text_input(
-            f"Digite um objetivo específico para '{instrumento[1]}':",
-            placeholder="Objetivo ",
-            key=f"novo_obj_{instrumento[0]}",
-            help="Insira um objetivo específico para este instrumento."
-        )
-        if st.button(f"Adicionar Objetivo para '{instrumento[1]}'", key=f"add_obj_{instrumento[0]}"):
-            if novo_objetivo.strip():
-                if novo_objetivo.strip() not in st.session_state["objetivos_por_instrumento"][chave_inst]:
-                    st.session_state["objetivos_por_instrumento"][chave_inst].append(novo_objetivo.strip())
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            novo_objetivo = st.text_input(
+                f"Adicione um Objetivo Específico para '{instrumento[1]}'",
+                key=f"novo_obj_{instrumento[0]}"
+            )
+        with col2:
+            if st.button("Adicionar", key=f"add_obj_{instrumento[0]}_button"):
+                if novo_objetivo.strip():
+                    if novo_objetivo not in st.session_state["objetivos_por_instrumento"][chave_inst]:
+                        st.session_state["objetivos_por_instrumento"][chave_inst].append(novo_objetivo)
+                    else:
+                        st.warning("Este objetivo já foi adicionado.")
                 else:
-                    st.warning("Este objetivo já foi adicionado.")
-            else:
-                st.warning("Por favor, insira um objetivo válido antes de adicionar.")
+                    st.warning("Por favor, insira um objetivo válido antes de adicionar.")
 
+        # Exibir Lista de Objetivos Adicionados
         if st.session_state["objetivos_por_instrumento"][chave_inst]:
             st.markdown("**Objetivos Adicionados:**", unsafe_allow_html=True)
             for idx, obj in enumerate(st.session_state["objetivos_por_instrumento"][chave_inst], 1):
@@ -345,48 +347,6 @@ def render_resumo(setor_escolhido, instrumentos_unidades, objetivos_por_instrume
     st.markdown(resumo_md, unsafe_allow_html=True)
 
 def render():
-    st.markdown(
-        """
-        <style>
-            :root {
-                --primary-color: #2C3E50;
-                --secondary-color: #3498DB;
-                --hover-color: #2980B9;
-                --header-font: 'Arial', sans-serif;
-                --body-font: 'Arial', sans-serif;
-            }
-            body {
-                font-family: var(--body-font);
-            }
-            h1, h2, h3, h4 {
-                color: var(--primary-color);
-            }
-            .stButton button {
-                background-color: var(--secondary-color);
-                color: white;
-                border: none;
-                border-radius: 5px;
-                padding: 0.5em 1em;
-            }
-            .stButton button:hover {
-                background-color: var(--hover-color);
-            }
-            .section-header {
-                font-size: 28px;
-                margin-bottom: 1rem;
-            }
-            .subsection-header {
-                font-size: 24px;
-                margin-bottom: 0.75rem;
-            }
-            .small-header {
-                font-size: 20px;
-                margin-bottom: 0.5rem;
-            }
-        </style>
-        """, unsafe_allow_html=True
-    )
-    
     st.info("Preencha as informações abaixo para registrar as associações. Por favor, siga as instruções cuidadosamente.")
 
     cpf, nome_usuario, setor_inicial = render_identificacao()
